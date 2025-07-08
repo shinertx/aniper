@@ -7,6 +7,17 @@ use tracing_subscriber::EnvFilter;
 #[derive(Parser)]
 #[command(name = "executor")]
 #[command(about = "Meme sniper executor with trading capabilities")]
+#[command(long_about = "
+The executor is the core trading component that processes market events,
+executes trades, and manages risk. It supports both live trading and
+replay mode for testing.
+
+URL Configuration Priority:
+1. --solana-url CLI argument (highest priority)
+2. SOLANA_RPC_URL environment variable
+3. SOLANA_URL environment variable  
+4. RPC_URL environment variable
+5. Default: https://api.devnet.solana.com")]
 struct Cli {
     /// Solana RPC URL to use (overrides SOLANA_RPC_URL env var)
     #[arg(long, env = "SOLANA_RPC_URL")]
@@ -19,8 +30,12 @@ struct Cli {
 #[derive(Subcommand)]
 enum Commands {
     /// Replay mode for testing with mock data
+    /// 
+    /// This mode loads historical trading events from a JSON file and processes
+    /// them without connecting to live market feeds. Useful for testing and
+    /// backtesting trading strategies.
     Replay {
-        /// Path to mock data JSON file
+        /// Path to mock data JSON file (e.g., tests/data/mock_data.json)
         file: String,
     },
 }
