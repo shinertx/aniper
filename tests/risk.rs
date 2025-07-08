@@ -39,6 +39,32 @@ async fn equity_floor_breach_emits_killswitch() {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn equity_floor_rpc_balance() {
+    use tempfile::NamedTempFile;
+    use solana_sdk::signature::{Keypair, Signer};
+
+    let kp = Keypair::new();
+    let mut file = NamedTempFile::new().unwrap();
+    solana_sdk::signature::write_keypair_file(&kp, file.path()).unwrap();
+    std::env::set_var("KEYPAIR_PATH", file.path());
+
+    // Poll quickly and set override low via mock balance.
+    std::env::set_var("RISK_EQUITY_POLL_MS", "50");
+    risk::_set_mock_balance_usdc(250.0);
+
+    let (ks_tx, mut ks_rx) = broadcast::channel(4);
+    let (_slip_tx, slip_rx) = mpsc::channel(4);
+
+    tokio::spawn(async move { let _ = risk::run(ks_tx, slip_rx).await; });
+
+    let ks = timeout(Duration::from_secs(1), ks_rx.recv())
+        .await
+        .expect("timeout")
+        .expect("sender closed");
+    assert!(matches!(ks, KillSwitch::EquityFloor));
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn slippage_breach_emits_killswitch() {
     let handle = PrometheusBuilder::new()
         .install_recorder()
