@@ -25,26 +25,29 @@ jobs:
         components: rustfmt, clippy
 
     # ───────────────────────  SOLANA  ────────────────────────────────
-  - name: Install Solana CLI (stable channel, fallback to v1.18.8)
-    shell: bash -eo pipefail {0}
-    run: |
-      set -euo pipefail
+ - name: Install Solana CLI (stable channel, fallback to v1.18.8)
+      shell: bash -eo pipefail {0}
+      run: |
+        set -euo pipefail
 
-      # 1️⃣ first try the new Anza “stable” script (no -y flag!)
-      if curl --retry 3 --retry-delay 5 -sSfL https://release.anza.xyz/stable/install \
-           | bash -s -- init --data-dir "$HOME/.local/share/solana" ; then
-        echo "✅ installed via Anza stable"
-      # 2️⃣ fallback: specific tag from the legacy Solana installer
-      elif curl --retry 3 --retry-delay 5 -sSfL https://release.solana.com/v1.18.8/install \
-           | bash -s --; then
-        echo "⚠️  installed via legacy v1.18.8 script"
-      else
-        echo "❌ Unable to install Solana CLI from either source" >&2
-        exit 1
-      fi
+        # 1. First, try the new Anza "stable" script with its 'init' command.
+        if curl --retry 3 --retry-delay 5 -sSfL https://release.anza.xyz/stable/install | \
+           bash -s -- init --data-dir "$HOME/.local/share/solana"; then
+          echo "✅ Installed Solana via Anza stable"
+        
+        # 2. As a fallback, try the legacy Solana installer without any arguments.
+        elif curl --retry 3 --retry-delay 5 -sSfL https://release.solana.com/v1.18.8/install | \
+             bash -s --; then
+          echo "⚠️ Installed Solana via legacy v1.18.8 script"
+        
+        else
+          echo "❌ Unable to install Solana CLI from either source" >&2
+          exit 1
+        fi
 
-      # add CLI to PATH for the remainder of the job
-      echo "$HOME/.local/share/solana/install/active_release/bin" >> "$GITHUB_PATH"
+        # Add the CLI to the PATH for the rest of the job.
+        echo "$HOME/.local/share/solana/install/active_release/bin" >> "$GITHUB_PATH"
+        solana --version
 
     # ──────────────────────────────────────────  CACHES  ───────────────────────────────────────────
     - name: Cache Cargo registry / git
