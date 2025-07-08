@@ -25,6 +25,7 @@ def _parse_metrics(text: str) -> Tuple[int, int]:
     """Return (hit, total) counters parsed from Prometheus exposition text."""
     hit = total = 0
     for line in text.splitlines():
+        line = line.strip()
         if not line or line.startswith("#"):
             continue
         if line.startswith("trade_hit_total"):
@@ -88,4 +89,4 @@ def main() -> None:  # pragma: no cover
     print(content)
 
 if __name__ == "__main__":
-    main() 
+    main()
