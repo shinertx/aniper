@@ -1,7 +1,7 @@
 use super::ws_feed::LaunchEvent;
 use anyhow::Result;
-use wasmtime::{Engine, Module};
 use once_cell::sync::OnceCell;
+use wasmtime::{Engine, Module};
 
 pub fn score(event: &LaunchEvent) -> f32 {
     // static heuristic until WASM hot-swap
@@ -34,4 +34,4 @@ pub fn load_wasm(bytes: &[u8]) -> Result<()> {
     // Store compiled module for later use. If already set, replace.
     let _ = MODULE.set(module);
     Ok(())
-} 
+}

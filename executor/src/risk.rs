@@ -8,11 +8,11 @@
 
 use anyhow::{anyhow, Result};
 use once_cell::sync::Lazy;
+use solana_client::rpc_client::RpcClient;
+use solana_sdk::signature::read_keypair_file;
 use std::sync::atomic::{AtomicU64, Ordering};
 use tokio::sync::{broadcast::Sender, mpsc::Receiver};
 use tokio::time::{sleep, Duration};
-use solana_client::rpc_client::RpcClient;
-use solana_sdk::signature::read_keypair_file;
 
 use crate::metrics::{set_risk_equity_usdc, set_risk_last_slippage, set_risk_slippage_threshold};
 
@@ -49,14 +49,14 @@ async fn get_balance_usdc() -> Result<f64> {
     }
 
     // Fallback to on-chain balance via RPC.
-    let path = std::env::var("KEYPAIR_PATH")
-        .map_err(|_| anyhow!("KEYPAIR_PATH not set"))?;
+    let path = std::env::var("KEYPAIR_PATH").map_err(|_| anyhow!("KEYPAIR_PATH not set"))?;
 
     let rpc_url = rpc_url();
     let lamports = tokio::task::spawn_blocking(move || {
         let kp = read_keypair_file(path).map_err(|e| anyhow!(e.to_string()))?;
         let rpc = RpcClient::new(rpc_url);
-        rpc.get_balance(&kp.pubkey()).map_err(|e| anyhow!(e.to_string()))
+        rpc.get_balance(&kp.pubkey())
+            .map_err(|e| anyhow!(e.to_string()))
     })
     .await??;
 
@@ -73,14 +73,20 @@ async fn redis_f64(key: &str) -> Option<f64> {
     });
 
     // Enforce TLS unless explicitly connecting to local dev instance.
-    if !(url.starts_with("rediss://") || url.starts_with("redis://127.0.0.1") || url.starts_with("redis://localhost")) {
+    if !(url.starts_with("rediss://")
+        || url.starts_with("redis://127.0.0.1")
+        || url.starts_with("redis://localhost"))
+    {
         panic!("Insecure Redis URL (TLS required): {url}");
     }
 
     if let Ok(client) = redis::Client::open(url) {
         if let Ok(mut conn) = client.get_async_connection().await {
-            let res: redis::RedisResult<Option<String>> =
-                redis::Cmd::new().arg("GET").arg(key).query_async(&mut conn).await;
+            let res: redis::RedisResult<Option<String>> = redis::Cmd::new()
+                .arg("GET")
+                .arg(key)
+                .query_async(&mut conn)
+                .await;
             if let Ok(Some(s)) = res {
                 return s.parse::<f64>().ok();
             }

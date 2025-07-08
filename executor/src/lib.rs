@@ -1,6 +1,6 @@
-pub mod ws_feed;
 pub mod classifier;
-pub mod trader;
-pub mod risk;
+pub mod compliance;
 pub mod metrics;
-pub mod compliance; 
+pub mod risk;
+pub mod trader;
+pub mod ws_feed;

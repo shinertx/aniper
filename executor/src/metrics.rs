@@ -1,7 +1,7 @@
-use metrics_exporter_prometheus::PrometheusBuilder;
-use std::net::SocketAddr;
 use base64::engine::general_purpose::STANDARD as BASE64_STD;
 use base64::Engine;
+use metrics_exporter_prometheus::PrometheusBuilder;
+use std::net::SocketAddr;
 
 pub fn serve_prometheus() {
     let builder = PrometheusBuilder::new();
@@ -28,11 +28,13 @@ pub fn serve_prometheus() {
                             // Enforce auth if configured.
                             if let Some(expected) = auth_header {
                                 match req.headers().get(hyper::header::AUTHORIZATION) {
-                                    Some(h) if h.to_str().ok() == Some(&expected) => {},
+                                    Some(h) if h.to_str().ok() == Some(&expected) => {}
                                     _ => {
-                                        return Ok::<_, hyper::Error>(hyper::Response::builder()
-                                            .status(hyper::StatusCode::UNAUTHORIZED)
-                                            .body("unauthorized".into())?);
+                                        return Ok::<_, hyper::Error>(
+                                            hyper::Response::builder()
+                                                .status(hyper::StatusCode::UNAUTHORIZED)
+                                                .body("unauthorized".into())?,
+                                        );
                                     }
                                 }
                             }
@@ -83,4 +85,4 @@ pub fn inc_killswitch(kind: &str) {
 /// startup so successive launches can be tracked.
 pub fn inc_restart() {
     metrics::increment_counter!("restarts_total");
-} 
+}

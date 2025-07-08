@@ -18,4 +18,4 @@ static DENYLIST: Lazy<HashSet<String>> = Lazy::new(|| {
 /// separated list of base58 pubkeys.
 pub fn is_sanctioned(addr: &str) -> bool {
     DENYLIST.contains(addr)
-} 
+}
