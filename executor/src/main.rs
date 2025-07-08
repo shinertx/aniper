@@ -34,21 +34,15 @@ async fn main() -> Result<()> {
         use executor::risk::KillSwitch;
         use tokio::time::{sleep, Duration};
 
-        loop {
-            match kill_rx.recv().await {
-                Ok(kind) => {
-                    let label = match kind {
-                        KillSwitch::EquityFloor => "equity_floor",
-                        KillSwitch::Slippage => "slippage",
-                    };
-                    metrics::inc_killswitch(label);
-                    tracing::error!(target = "killswitch", "CRITICAL kill-switch triggered: {:?}", kind);
-                    sleep(Duration::from_millis(100)).await;
-                    std::process::exit(1);
-                }
-                Err(tokio::sync::broadcast::error::RecvError::Lagged(_)) => continue, // ignore lagging
-                Err(_) => break, // channel closed – risk task failed, exit listener
-            }
+        while let Ok(kind) = kill_rx.recv().await {
+            let label = match kind {
+                KillSwitch::EquityFloor => "equity_floor",
+                KillSwitch::Slippage => "slippage",
+            };
+            metrics::inc_killswitch(label);
+            tracing::error!(target = "killswitch", "CRITICAL kill-switch triggered: {:?}", kind);
+            sleep(Duration::from_millis(100)).await;
+            std::process::exit(1);
         }
     });
 
