@@ -70,6 +70,8 @@ Every PR **must attach**:
 * CI runs `./scripts/canary_test.sh models/candidate/model.wasm`.
 * If ROI ↑ and JS-divergence ≤ 0.25 → auto-move to `models/prod/`.
 * Provisioner final sign-off required in PR.
+* For implementation details of runtime LLM agents see docs/AGENTS_GUIDE.md
+
 
 ---
 
