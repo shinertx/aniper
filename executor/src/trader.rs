@@ -57,6 +57,7 @@ struct SwapTx {
 /// placeholder implementation – on errors the caller should fall back to `fallback_transfer_tx`.
 async fn fetch_swap_tx(client: &RpcClient, keypair: &Keypair, output_mint: &str) -> Result<SwapTx> {
     #[derive(serde::Deserialize)]
+    #[allow(dead_code)]
     struct QuoteRoute {
         in_amount: String,
         out_amount: String,
@@ -68,6 +69,7 @@ async fn fetch_swap_tx(client: &RpcClient, keypair: &Keypair, output_mint: &str)
     }
 
     #[derive(serde::Deserialize)]
+    #[allow(dead_code)]
     struct QuoteResp {
         data: Vec<QuoteRoute>,
     }
@@ -86,10 +88,7 @@ async fn fetch_swap_tx(client: &RpcClient, keypair: &Keypair, output_mint: &str)
     let api = jupiter_api();
 
     // -- 1. Quote -----------------------------------------------------------
-    let quote_url = format!(
-        "{api}/quote?inputMint={}&outputMint={}&amount=1000000&slippageBps=100&onlyDirectRoutes=false&platformFeeBps=0",
-        USDC_MINT, output_mint
-    );
+    let quote_url = format!("{}/quote?inputMint={}&outputMint={}&amount=1000000&slippageBps=100&onlyDirectRoutes=false&platformFeeBps=0", api, USDC_MINT, output_mint);
     let _quote: QuoteResp = http.get(&quote_url).send().await?.json().await?;
     // For now we do not inspect the quote – the second call will embed
     // slippage & post-only enforcement.  Retaining for completeness.
@@ -97,12 +96,7 @@ async fn fetch_swap_tx(client: &RpcClient, keypair: &Keypair, output_mint: &str)
     // -- 2. Swap ------------------------------------------------------------
     // Jupiter swap endpoint requires the user public key so returned TX has us
     // as fee-payer.  The market makin' specifics are abstracted away.
-    let swap_url = format!(
-        "{api}/swap?inputMint={}&outputMint={}&amount=1000000&slippageBps=100&userPublicKey={}&wrapAndUnwrapSol=true&dynamicJitPricing=true&useSharedAccounts=true&asLegacyTransaction=true",
-        USDC_MINT,
-        output_mint,
-        keypair.pubkey()
-    );
+    let swap_url = format!("{}/swap?inputMint={}&outputMint={}&slippageBps=100&userPublicKey={}&wrapUnwrapSOL=true&feeBps=0", api, USDC_MINT, output_mint, keypair.pubkey());
 
     let resp: SwapResp = http.get(&swap_url).send().await?.json().await?;
     //  FIX: use BASE64_STD engine instead of deprecated base64::decode
@@ -259,7 +253,7 @@ pub async fn run(
     // logic is fully covered in CI.
     let keypair = match std::env::var("KEYPAIR_PATH") {
         Ok(p) => read_keypair_file(&p)
-            .map_err(|e| anyhow!(format!("failed to load keypair from {p}: {e}")))?,
+            .map_err(|e| anyhow!("failed to load keypair from {p}: {e}", p = p, e = e))?,
         Err(_) => {
             return Err(anyhow!(
                 "KEYPAIR_PATH not set – refusing to start; see README 'Security Controls'."
@@ -328,7 +322,7 @@ pub async fn run(
         let mut rpc_urls: Vec<String> = std::env::var("SOLANA_RPC_URLS")
             .ok()
             .map(|v| v.split(',').map(|s| s.trim().to_string()).collect())
-            .unwrap_or_else(Vec::new);
+            .unwrap_or_default();
         if rpc_urls.is_empty() {
             rpc_urls.push(rpc_url());
         }

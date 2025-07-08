@@ -47,7 +47,7 @@ pub fn serve_prometheus() {
                             }
                         }
                         let body = handle.render();
-                        Ok::<_, hyper::Error>(hyper::Response::new(body.into()))
+                        Ok::<_, hyper::Error>(hyper::Response::new(body))
                     }
                 }))
             }

@@ -10,7 +10,7 @@ static DENYLIST: Lazy<HashSet<String>> = Lazy::new(|| {
                 .filter(|s| !s.is_empty())
                 .collect()
         })
-        .unwrap_or_else(HashSet::new)
+        .unwrap_or_default()
 });
 
 /// Returns true if the supplied Solana address is on the deny-list.
