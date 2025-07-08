@@ -63,4 +63,4 @@ pub fn inc_killswitch(kind: &str) {
 /// startup so successive launches can be tracked.
 pub fn inc_restart() {
     metrics::increment_counter!("restarts_total");
-} 
+}

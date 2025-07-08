@@ -1,7 +1,7 @@
 use anyhow::Result;
-use tracing_subscriber::EnvFilter;
-use executor::{metrics, trader, ws_feed};
 use executor::risk;
+use executor::{metrics, trader, ws_feed};
+use tracing_subscriber::EnvFilter;
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -40,7 +40,11 @@ async fn main() -> Result<()> {
                 KillSwitch::Slippage => "slippage",
             };
             metrics::inc_killswitch(label);
-            tracing::error!(target = "killswitch", "CRITICAL kill-switch triggered: {:?}", kind);
+            tracing::error!(
+                target = "killswitch",
+                "CRITICAL kill-switch triggered: {:?}",
+                kind
+            );
             sleep(Duration::from_millis(100)).await;
             std::process::exit(1);
         }
@@ -49,4 +53,4 @@ async fn main() -> Result<()> {
     metrics::serve_prometheus();
     futures::future::pending::<()>().await;
     Ok(())
-} 
+}
