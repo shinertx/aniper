@@ -25,7 +25,7 @@ jobs:
         components: rustfmt, clippy
 
     # ───────────────────────  SOLANA  ────────────────────────────────
- - name: Install Solana CLI (stable channel, fallback to v1.18.8)
+   - name: Install Solana CLI (stable channel, fallback to v1.18.8)
       shell: bash -eo pipefail {0}
       run: |
         set -euo pipefail
