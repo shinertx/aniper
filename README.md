@@ -7,7 +7,7 @@ MEME-SNIPER POD — Turn \$1 000 → \$50 000 in 7 Days
 First-minute sniping of Solana/Base memecoin launches using:
 * **Rust executor** (sub-slot latency, multi-RPC broadcast)
 * **WASM micro-classifier** (offline-trained, in-memory scoring)
-* **LLM “brain” agents** (feature mining, narrative scoring, red-team)
+* **LLM "brain" agents** (feature mining, narrative scoring, red-team)
 * **GCP stack** (GKE Autopilot, Cloud Build, Secret Manager, CloudSQL)
 
 Architecture guarantees **zero LLM calls in the micro-latency path**.
@@ -69,6 +69,11 @@ Use make killswitch to halt instantly.
 5 | Telemetry
 Prometheus scrape /metrics from executor.
 
+Key Prometheus counters now exported:
+
+* `killswitch_total{kind="equity_floor|slippage"}` – counts forced shutdowns by guard kind.
+* `restarts_total` – monotonically tracks executor (re)starts across pod restarts.
+
 Grafana dashboard dashboards/latency.json.
 
 Cloud Monitoring alerts: p95 > 600 ms, equity < $350, slippage > 5 %.
@@ -77,7 +82,7 @@ Cloud Monitoring alerts: p95 > 600 ms, equity < $350, slippage > 5 %.
 HSM-backed hot wallets (Cloud KMS).
 
 Nightly key rotation (see scripts/rotate_keys.sh).
- └── AGENTS.md            # Workflow constitution
+└── AGENTS.md            # Workflow constitution
 +    docs/AGENTS_GUIDE.md # LLM agent design & guardrails
 
 

@@ -48,4 +48,16 @@ pub fn set_risk_last_slippage(v: f64) {
 /// Track account equity (USDC) sampled by the equity-floor guard.
 pub fn set_risk_equity_usdc(v: f64) {
     metrics::gauge!("risk_equity_usdc", v);
+}
+
+/// Increment the killswitch counter for the provided `kind` label.
+/// The `kind` is exposed as a Prometheus label enabling per-guard tracking.
+pub fn inc_killswitch(kind: &str) {
+    metrics::increment_counter!("killswitch_total", "kind" => kind);
+}
+
+/// Increment the restart counter – call from the executor entry-point at
+/// startup so successive launches can be tracked.
+pub fn inc_restart() {
+    metrics::increment_counter!("restarts_total");
 } 
