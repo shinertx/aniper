@@ -3,6 +3,10 @@ use serde::Deserialize;
 use tokio::sync::mpsc::Sender;
 use tokio_tungstenite::{connect_async, tungstenite::Message};
 use tracing::warn;
+/* -------------------------------------------------------------------------
+ * NEW: anyhow for ergonomic Result
+ * ---------------------------------------------------------------------- */
+use anyhow::Result;
 
 #[derive(Debug, Deserialize)]
 pub struct LaunchEvent {
@@ -27,6 +31,9 @@ pub fn normalise_message(raw: &str) -> Option<LaunchEvent> {
     serde_json::from_str::<LaunchEvent>(raw).ok()
 }
 
+/* -------------------------------------------------------------------------
+ * FIX: return a single-parameter Result
+ * ---------------------------------------------------------------------- */
 pub async fn run(tx: Sender<LaunchEvent>) -> Result<()> {
     use std::time::Duration;
     let url = "wss://devnet-replay.example/ws";
@@ -57,4 +64,7 @@ pub async fn run(tx: Sender<LaunchEvent>) -> Result<()> {
         }
         tokio::time::sleep(Duration::from_secs(1)).await;
     }
+
+    #[allow(unreachable_code)]
+    Ok(())
 }
