@@ -2,5 +2,13 @@
 members = ["executor"]
 resolver = "2"
 
-# Note: Zeroize version conflict between Solana (requires <1.4) and reqwest (requires ^1.6.0)
-# This will need to be resolved when Solana updates or with dependency overrides in CI 
+# TODO: Patch to reconcile Solana 1.18 (zeroize <1.4) with reqwest/rustls (zeroize 1.6).
+# The requested [patch.crates-io] approach has technical limitations:
+# - Cannot patch crates.io to crates.io with same name
+# - zeroize v1.3.0 git tag does not exist in upstream repository
+# Alternative solutions needed:
+# - Downgrade reqwest to version compatible with zeroize 1.3
+# - Upgrade Solana to version compatible with zeroize 1.6+
+# - Create local fork of zeroize with proper git repository
+# [patch.crates-io]
+# zeroize = "=1.3.0"  # Currently causes "points to same source" error 
