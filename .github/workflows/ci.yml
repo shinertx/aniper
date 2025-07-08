@@ -24,26 +24,27 @@ jobs:
         override: true
         components: rustfmt, clippy
 
-    # ──────────────────────────────────────────  SOLANA CLI  ───────────────────────────────────────
-    - name: Install Solana CLI (stable, fallback ${{ env.SOLANA_VERSION }})
-      id: solana
-      shell: bash -eo pipefail {0}
-      run: |
-        set -u
-        install_url="https://release.anza.xyz/stable/install"
-        fallback_url="https://release.solana.com/${SOLANA_VERSION}/install"
+    # ───────────────────────  SOLANA  ────────────────────────────────
+  - name: Install Solana CLI (stable channel, fallback to v1.18.8)
+    shell: bash -eo pipefail {0}
+    run: |
+      set -euo pipefail
 
-        for url in "$install_url" "$fallback_url"; do
-          echo "Attempting Solana install via $url"
-          if curl --connect-timeout 10 --retry 3 --retry-delay 5 -sSfL "$url" | bash -s -- -y; then
-            echo "$HOME/.local/share/solana/install/active_release/bin" >> "$GITHUB_PATH"
-            solana --version
-            exit 0
-          fi
-        done
-
-        echo "::error::Unable to install Solana CLI from either source." >&2
+      # 1️⃣ first try the new Anza “stable” script (no -y flag!)
+      if curl --retry 3 --retry-delay 5 -sSfL https://release.anza.xyz/stable/install \
+           | bash -s -- init --data-dir "$HOME/.local/share/solana" ; then
+        echo "✅ installed via Anza stable"
+      # 2️⃣ fallback: specific tag from the legacy Solana installer
+      elif curl --retry 3 --retry-delay 5 -sSfL https://release.solana.com/v1.18.8/install \
+           | bash -s -- -y ; then
+        echo "⚠️  installed via legacy v1.18.8 script"
+      else
+        echo "❌ Unable to install Solana CLI from either source" >&2
         exit 1
+      fi
+
+      # add CLI to PATH for the remainder of the job
+      echo "$HOME/.local/share/solana/install/active_release/bin" >> "$GITHUB_PATH"
 
     # ──────────────────────────────────────────  CACHES  ───────────────────────────────────────────
     - name: Cache Cargo registry / git
