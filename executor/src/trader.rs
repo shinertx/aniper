@@ -20,8 +20,20 @@ use solana_sdk::{
 const MAX_CONFIRMATION_SLOTS: u64 = 10;
 
 /// Returns the RPC URL to use (defaults to Solana devnet).
-fn rpc_url() -> String {
-    std::env::var("SOLANA_RPC_URL").unwrap_or_else(|_| "https://api.devnet.solana.com".to_string())
+/// Temporary fix: Added better fallback handling for CLI scenarios.
+pub fn rpc_url() -> String {
+    // Try multiple environment variables for compatibility
+    std::env::var("SOLANA_RPC_URL")
+        .or_else(|_| std::env::var("SOLANA_URL"))
+        .or_else(|_| std::env::var("RPC_URL"))
+        .unwrap_or_else(|_| {
+            // Check if we're running in test/local mode
+            if std::env::var("RUST_TEST").is_ok() || std::env::var("CARGO_PKG_NAME").is_ok() {
+                "http://127.0.0.1:8899".to_string()
+            } else {
+                "https://api.devnet.solana.com".to_string()
+            }
+        })
 }
 
 /// Returns the base Jupiter API (quote & swap v6).

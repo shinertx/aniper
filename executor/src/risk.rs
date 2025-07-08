@@ -18,8 +18,21 @@ use crate::metrics::{set_risk_equity_usdc, set_risk_last_slippage, set_risk_slip
 
 const LAMPORTS_PER_USDC: f64 = 1_000_000.0;
 
+/// Returns the RPC URL to use (defaults to Solana devnet).
+/// Temporary fix: Added better fallback handling for CLI scenarios.
 fn rpc_url() -> String {
-    std::env::var("SOLANA_RPC_URL").unwrap_or_else(|_| "https://api.devnet.solana.com".to_string())
+    // Try multiple environment variables for compatibility
+    std::env::var("SOLANA_RPC_URL")
+        .or_else(|_| std::env::var("SOLANA_URL"))
+        .or_else(|_| std::env::var("RPC_URL"))
+        .unwrap_or_else(|_| {
+            // Check if we're running in test/local mode
+            if std::env::var("RUST_TEST").is_ok() || std::env::var("CARGO_PKG_NAME").is_ok() {
+                "http://127.0.0.1:8899".to_string()
+            } else {
+                "https://api.devnet.solana.com".to_string()
+            }
+        })
 }
 
 #[derive(Debug, Clone)]
