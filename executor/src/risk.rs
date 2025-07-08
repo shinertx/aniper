@@ -10,6 +10,10 @@ use anyhow::{anyhow, Result};
 use once_cell::sync::Lazy;
 use solana_client::rpc_client::RpcClient;
 use solana_sdk::signature::read_keypair_file;
+/* -------------------------------------------------------------------------
+ * NEW: bring `Signer` trait into scope so `pubkey()` resolves
+ * ---------------------------------------------------------------------- */
+use solana_sdk::signer::Signer;
 use std::sync::atomic::{AtomicU64, Ordering};
 use tokio::sync::{broadcast::Sender, mpsc::Receiver};
 use tokio::time::{sleep, Duration};

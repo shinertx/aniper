@@ -1,69 +1,126 @@
+   Compiling executor v0.1.0 (/workspace/aniper/executor)
+error[E0432]: unresolved imports `crate::metrics::set_risk_equity_usdc`, `crate::metrics::set_risk_last_slippage`, `crate::metrics::set_risk_slippage_threshold`
+  --> executor/src/risk.rs:21:22
+   |
+21 | use crate::metrics::{set_risk_equity_usdc, set_risk_last_slippage, set_risk_slippage_threshold};
+   |                      ^^^^^^^^^^^^^^^^^^^^  ^^^^^^^^^^^^^^^^^^^^^^  ^^^^^^^^^^^^^^^^^^^^^^^^^^^ no `set_risk_slippage_threshold` in `metrics`
+   |                      |                     |
+   |                      |                     no `set_risk_last_slippage` in `metrics`
+   |                      no `set_risk_equity_usdc` in `metrics`
+
+error[E0432]: unresolved imports `super::metrics::inc_trades_confirmed`, `super::metrics::inc_trades_submitted`
+ --> executor/src/trader.rs:2:22
+  |
+2 | use super::metrics::{inc_trades_confirmed, inc_trades_submitted};
+  |                      ^^^^^^^^^^^^^^^^^^^^  ^^^^^^^^^^^^^^^^^^^^ no `inc_trades_submitted` in `metrics`
+  |                      |
+  |                      no `inc_trades_confirmed` in `metrics`
+
+warning: use of deprecated function `base64::decode`: Use Engine::decode
+   --> executor/src/trader.rs:106:23
+    |
+106 |     let raw = base64::decode(resp.swap_transaction.clone())?;
+    |                       ^^^^^^
+    |
+    = note: `#[warn(deprecated)]` on by default
+
+error[E0107]: enum takes 2 generic arguments but 1 generic argument was supplied
+  --> executor/src/ws_feed.rs:30:46
+   |
+30 | pub async fn run(tx: Sender<LaunchEvent>) -> Result<()> {
+   |                                              ^^^^^^ -- supplied 1 generic argument
+   |                                              |
+   |                                              expected 2 generic arguments
+   |
+help: add missing generic argument
+   |
+30 | pub async fn run(tx: Sender<LaunchEvent>) -> Result<(), E> {
+   |                                                       +++
+
+error[E0284]: type annotations needed
+  --> executor/src/metrics.rs:43:46
+   |
+26 |         let server = hyper::Server::bind(&addr).serve(hyper::service::make_service_fn(move |_| {
+   |                                                 ----- type must be known at this point
+...
+43 |                                             .body("unauthorized".into())
+   |                                              ^^^^ cannot infer type of the type parameter `T` declared on the method `body`
+   |
+   = note: cannot satisfy `<_ as HttpBody>::Error == _`
+help: consider specifying the generic argument
+   |
+43 |                                             .body::<T>("unauthorized".into())
+   |                                                  +++++
+
+error[E0283]: type annotations needed
+  --> executor/src/metrics.rs:43:46
+   |
+43 | ...                   .body("unauthorized".into())
+   |                        ^^^^                ---- type must be known at this point
+   |                        |
+   |                        cannot infer type of the type parameter `T` declared on the method `body`
+   |
+   = note: multiple `impl`s satisfying `&str: Into<_>` found in the following crates: `core`, `rtoolbox`:
+           - impl<'a> Into<rtoolbox::safe_string::SafeString> for &'a str;
+           - impl<T, U> Into<U> for T
+             where U: From<T>;
+help: consider specifying the generic argument
+   |
+43 |                                             .body::<T>("unauthorized".into())
+   |                                                  +++++
+
+error[E0283]: type annotations needed
+  --> executor/src/metrics.rs:43:46
+   |
+43 |                                             .body("unauthorized".into())
+   |                                              ^^^^ cannot infer type of the type parameter `T` declared on the method `body`
+...
+50 |                         Ok::<_, hyper::Error>(hyper::Response::new(body.into()))
+   |                                                                         ---- type must be known at this point
+   |
+   = note: multiple `impl`s satisfying `std::string::String: Into<_>` found in the following crates: `core`, `rtoolbox`:
+           - impl Into<rtoolbox::safe_string::SafeString> for std::string::String;
+           - impl<T, U> Into<U> for T
+             where U: From<T>;
+help: consider specifying the generic argument
+   |
+43 |                                             .body::<T>("unauthorized".into())
+   |                                                  +++++
+
+warning: variable does not need to be mutable
+   --> executor/src/trader.rs:165:13
+    |
+165 |         let mut ixs = vec![ComputeBudgetInstruction::set_compute_unit_price(
+    |             ----^^^
+    |             |
+    |             help: remove this `mut`
+    |
+    = note: `#[warn(unused_mut)]` on by default
+
+Some errors have detailed explanations: E0107, E0283, E0284, E0432.
+For more information about an error, try `rustc --explain E0107`.
+warning: `executor` (lib) generated 2 warnings
+error: could not compile `executor` (lib) due to 6 previous errors; 2 warnings emitted
+warning: build failed, waiting for other jobs to finish...
+warning: `executor` (lib test) generated 2 warnings (2 duplicates)
+error: could not compile `executor` (lib test) due to 6 previous errors; 2 warnings emitted
+
+no tests ran in 0.22s
+error: cannot specify features for packages outside of workspace
+DRY RUN: Would execute replay harness with mock data
+Command: cargo run --release --bin executor -- --replay tests/data/mock_data.json
 error: 'cargo-fmt' is not installed for the toolchain 'stable-x86_64-unknown-linux-gnu'.
 To install, run `rustup component add rustfmt`
-src:1:1: E902 No such file or directory (os error 2)
+brain/agents/heuristic_agent.py:30:9: E401 [*] Multiple imports on one line
+   |
+28 |     def export_model(model, feature_names):  # noqa: D401
+29 |         """Fallback no-op exporter used in tests when wasm_exporter is absent."""
+30 |         import tempfile, pickle, pathlib
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ E401
+31 |         tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".wasm")
+32 |         pickle.dump((model, feature_names), tmp)
+   |
+   = help: Split imports
+
 Found 1 error.
-error: 'cargo-clippy' is not installed for the toolchain 'stable-x86_64-unknown-linux-gnu'.
-To install, run `rustup component add clippy`
-warning: virtual workspace defaulting to `resolver = "1"` despite one or more workspace members being on edition 2021 which implies `resolver = "2"`
-note: to keep the current resolver, specify `workspace.resolver = "1"` in the workspace root's manifest
-note: to use the edition 2021 resolver, specify `workspace.resolver = "2"` in the workspace root's manifest
-note: for more details see https://doc.rust-lang.org/cargo/reference/resolver.html#resolver-versions
-    Updating crates.io index
-error: failed to select a version for `zeroize`.
-    ... required by package `curve25519-dalek v3.2.1`
-    ... which satisfies dependency `curve25519-dalek = "^3.2.1"` of package `solana-perf v1.18.0`
-    ... which satisfies dependency `solana-perf = "=1.18.0"` of package `solana-streamer v1.18.0`
-    ... which satisfies dependency `solana-streamer = "=1.18.0"` of package `solana-client v1.18.0`
-    ... which satisfies dependency `solana-client = "^1.18"` of package `executor v0.1.0 (/workspace/aniper/executor)`
-versions that meet the requirements `>=1, <1.4` are: 1.3.0, 1.2.0, 1.1.1, 1.1.0, 1.0.0
-
-all possible versions conflict with previously selected packages.
-
-  previously selected package `zeroize v1.6.0`
-    ... which satisfies dependency `zeroize = "^1.6.0"` of package `rustls v0.22.2`
-    ... which satisfies dependency `rustls = "^0.22.2"` of package `reqwest v0.12.0`
-    ... which satisfies dependency `reqwest = "^0.12"` of package `executor v0.1.0 (/workspace/aniper/executor)`
-
-failed to select a version for `zeroize` which could resolve this conflict
-warning: virtual workspace defaulting to `resolver = "1"` despite one or more workspace members being on edition 2021 which implies `resolver = "2"`
-note: to keep the current resolver, specify `workspace.resolver = "1"` in the workspace root's manifest
-note: to use the edition 2021 resolver, specify `workspace.resolver = "2"` in the workspace root's manifest
-note: for more details see https://doc.rust-lang.org/cargo/reference/resolver.html#resolver-versions
-error: cannot specify features for packages outside of workspace
-Requirement already satisfied: pytest in /root/.pyenv/versions/3.12.10/lib/python3.12/site-packages (8.4.0)
-Collecting openai (from -r brain/requirements.txt (line 1))
-  Using cached openai-1.93.1-py3-none-any.whl.metadata (29 kB)
-Collecting asyncio (from -r brain/requirements.txt (line 2))
-  Using cached asyncio-3.4.3-py3-none-any.whl.metadata (1.7 kB)
-Collecting pandas (from -r brain/requirements.txt (line 3))
-  Using cached pandas-2.3.1-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl.metadata (91 kB)
-Collecting pyarrow (from -r brain/requirements.txt (line 4))
-  Using cached pyarrow-20.0.0-cp312-cp312-manylinux_2_28_x86_64.whl.metadata (3.3 kB)
-Collecting lightgbm (from -r brain/requirements.txt (line 5))
-  Using cached lightgbm-4.6.0-py3-none-manylinux_2_28_x86_64.whl.metadata (17 kB)
-ERROR: Could not find a version that satisfies the requirement wasm-exporter (from versions: none)
-ERROR: No matching distribution found for wasm-exporter
-
-no tests ran in 0.01s
-bash: ./scripts/replay_harness.sh: Permission denied
-warning: virtual workspace defaulting to `resolver = "1"` despite one or more workspace members being on edition 2021 which implies `resolver = "2"`
-note: to keep the current resolver, specify `workspace.resolver = "1"` in the workspace root's manifest
-note: to use the edition 2021 resolver, specify `workspace.resolver = "2"` in the workspace root's manifest
-note: for more details see https://doc.rust-lang.org/cargo/reference/resolver.html#resolver-versions
-    Updating crates.io index
-error: failed to select a version for `zeroize`.
-    ... required by package `curve25519-dalek v3.2.1`
-    ... which satisfies dependency `curve25519-dalek = "^3.2.1"` of package `solana-perf v1.18.0`
-    ... which satisfies dependency `solana-perf = "=1.18.0"` of package `solana-streamer v1.18.0`
-    ... which satisfies dependency `solana-streamer = "=1.18.0"` of package `solana-client v1.18.0`
-    ... which satisfies dependency `solana-client = "^1.18"` of package `executor v0.1.0 (/workspace/aniper/executor)`
-versions that meet the requirements `>=1, <1.4` are: 1.3.0, 1.2.0, 1.1.1, 1.1.0, 1.0.0
-
-all possible versions conflict with previously selected packages.
-
-  previously selected package `zeroize v1.6.0`
-    ... which satisfies dependency `zeroize = "^1.6.0"` of package `rustls v0.22.2`
-    ... which satisfies dependency `rustls = "^0.22.2"` of package `reqwest v0.12.0`
-    ... which satisfies dependency `reqwest = "^0.12"` of package `executor v0.1.0 (/workspace/aniper/executor)`
-
-failed to select a version for `zeroize` which could resolve this conflict
+[*] 1 fixable with the `--fix` option.
