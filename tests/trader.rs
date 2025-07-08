@@ -76,3 +76,29 @@ async fn trade_flow_confirmed() {
     // Clean up validator.
     let _ = validator.kill();
 } 
+
+#[test]
+fn test_rpc_url_fallback() {
+    // Clear any existing env vars
+    std::env::remove_var("SOLANA_RPC_URL");
+    std::env::remove_var("SOLANA_URL");
+    std::env::remove_var("RPC_URL");
+    
+    // Test default fallback
+    let url = executor::trader::rpc_url();
+    assert!(url.contains("api.devnet.solana.com") || url.contains("127.0.0.1:8899"));
+    
+    // Test SOLANA_RPC_URL takes priority
+    std::env::set_var("SOLANA_RPC_URL", "http://custom.example.com");
+    let url = executor::trader::rpc_url();
+    assert_eq!(url, "http://custom.example.com");
+    
+    // Test fallback chain
+    std::env::remove_var("SOLANA_RPC_URL");
+    std::env::set_var("SOLANA_URL", "http://fallback.example.com");
+    let url = executor::trader::rpc_url();
+    assert_eq!(url, "http://fallback.example.com");
+    
+    // Cleanup
+    std::env::remove_var("SOLANA_URL");
+}
