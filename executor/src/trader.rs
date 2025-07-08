@@ -3,6 +3,8 @@ use super::metrics::{inc_trades_confirmed, inc_trades_submitted};
 use super::ws_feed::LaunchEvent;
 use crate::compliance;
 use anyhow::{anyhow, Result};
+use base64::engine::general_purpose::STANDARD as BASE64_STD;
+use base64::Engine;
 use std::time::Duration;
 use tokio::sync::mpsc::Receiver;
 
@@ -103,7 +105,8 @@ async fn fetch_swap_tx(client: &RpcClient, keypair: &Keypair, output_mint: &str)
     );
 
     let resp: SwapResp = http.get(&swap_url).send().await?.json().await?;
-    let raw = base64::decode(resp.swap_transaction.clone())?;
+    //  FIX: use BASE64_STD engine instead of deprecated base64::decode
+    let raw = BASE64_STD.decode(resp.swap_transaction.clone())?;
     let mut tx: Transaction = bincode::deserialize(&raw)?;
 
     // Ensure recent blockhash & additional signature from *our* private key –
