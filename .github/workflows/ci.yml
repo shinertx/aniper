@@ -34,7 +34,7 @@ jobs:
       - run: cargo fmt --check
       - name: Install ruff
         run: pip install ruff
-      - run: ruff check src/
+      - run: ruff check brain/ tests/
       - run: cargo clippy --all-targets --all-features -- -D warnings
       - run: cargo test --all --release
       - run: cargo test -p classifier --features wasm
