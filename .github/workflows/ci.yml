@@ -35,7 +35,7 @@ jobs:
 
         for url in "$install_url" "$fallback_url"; do
           echo "Attempting Solana install via $url"
-          if curl --connect-timeout 10 --retry 3 --retry-delay 5 -sSfL "$url" | bash -s -- -y; then
+          if curl --connect-timeout 10 --retry 3 --retry-delay 5 -sSfL "$url" | bash -s --; then
             echo "$HOME/.local/share/solana/install/active_release/bin" >> "$GITHUB_PATH"
             solana --version
             exit 0
