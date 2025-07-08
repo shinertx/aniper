@@ -4,6 +4,7 @@ use super::classifier::score;
 use super::ws_feed::LaunchEvent;
 use std::time::Duration;
 use super::metrics::{inc_trades_submitted, inc_trades_confirmed};
+use crate::compliance;
 
 use reqwest::Client;
 use solana_client::rpc_client::RpcClient;
@@ -231,6 +232,12 @@ pub async fn run(mut rx: Receiver<LaunchEvent>, slip_tx: tokio::sync::mpsc::Send
 
     while let Some(ev) = rx.recv().await {
         if score(&ev) <= 0.5 {
+            continue;
+        }
+
+        // Compliance / sanctions check.
+        if compliance::is_sanctioned(&ev.creator) || compliance::is_sanctioned(&ev.mint) {
+            tracing::warn!(target="trade", "Skipping sanctioned asset or creator: creator={} mint={}", ev.creator, ev.mint);
             continue;
         }
 

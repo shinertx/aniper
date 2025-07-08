@@ -68,7 +68,15 @@ async fn get_balance_usdc() -> Result<f64> {
 // ---------------------------------------------------------------------------
 
 async fn redis_f64(key: &str) -> Option<f64> {
-    let url = std::env::var("REDIS_URL").unwrap_or_else(|_| "redis://127.0.0.1/".into());
+    let url = std::env::var("REDIS_URL").unwrap_or_else(|_| {
+        panic!("REDIS_URL not set – refusing to start (risk module)");
+    });
+
+    // Enforce TLS unless explicitly connecting to local dev instance.
+    if !(url.starts_with("rediss://") || url.starts_with("redis://127.0.0.1") || url.starts_with("redis://localhost")) {
+        panic!("Insecure Redis URL (TLS required): {url}");
+    }
+
     if let Ok(client) = redis::Client::open(url) {
         if let Ok(mut conn) = client.get_async_connection().await {
             let res: redis::RedisResult<Option<String>> =
