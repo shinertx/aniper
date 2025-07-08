@@ -1,4 +1,4 @@
-use metrics_exporter_prometheus::{PrometheusBuilder, PrometheusHandle};
+use metrics_exporter_prometheus::PrometheusBuilder;
 use std::net::SocketAddr;
 
 pub fn serve_prometheus() {
@@ -21,4 +21,16 @@ pub fn serve_prometheus() {
             }))
             .unwrap();
     });
+}
+
+// --- Trade metrics helpers -------------------------------------------------
+
+/// Increment when a trade transaction is submitted to the cluster.
+pub fn inc_trades_submitted() {
+    metrics::increment_counter!("trades_submitted_total");
+}
+
+/// Increment when the previously submitted trade is confirmed.
+pub fn inc_trades_confirmed() {
+    metrics::increment_counter!("trades_confirmed_total");
 } 
