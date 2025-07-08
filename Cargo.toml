@@ -2,7 +2,5 @@
 members = ["executor"]
 resolver = "2"
 
-# Patch to reconcile Solana 1.18 (zeroize <1.4) with reqwest/rustls (zeroize 1.6).
-# Until Solana updates, we force the lower version universally.
-[patch.crates-io]
-zeroize = "=1.3.0" 
+# Note: Zeroize version conflict between Solana (requires <1.4) and reqwest (requires ^1.6.0)
+# This will need to be resolved when Solana updates or with dependency overrides in CI 
