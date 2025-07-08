@@ -36,7 +36,7 @@ jobs:
         echo "✅ installed via Anza stable"
       # 2️⃣ fallback: specific tag from the legacy Solana installer
       elif curl --retry 3 --retry-delay 5 -sSfL https://release.solana.com/v1.18.8/install \
-           | bash -s -- -y ; then
+           | bash -s --; then
         echo "⚠️  installed via legacy v1.18.8 script"
       else
         echo "❌ Unable to install Solana CLI from either source" >&2
