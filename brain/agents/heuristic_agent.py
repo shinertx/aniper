@@ -117,5 +117,21 @@ def main():
     sys.stdout.write("\n")
 
 
+def produce() -> tuple[str, str]:
+    """Thin wrapper so manager can ingest nightly manifest.
+
+    We reuse `main()` but capture its stdout instead of duplicating logic.
+    Returns a tuple of (artifact_name, json_content).
+    """
+    import io
+    import contextlib
+
+    buf = io.StringIO()
+    with contextlib.redirect_stdout(buf):
+        main()
+    content = buf.getvalue().strip()
+    return "manifest.json", content
+
+
 if __name__ == "__main__":
     main() 

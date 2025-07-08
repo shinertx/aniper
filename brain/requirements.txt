@@ -4,4 +4,7 @@ pandas
 pyarrow
 lightgbm
 wasm-exporter
-numpy 
+numpy
+pyyaml
+httpx
+redis 
