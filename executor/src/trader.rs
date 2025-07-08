@@ -169,7 +169,7 @@ fn sign_and_send(urls: &[String], tx: &Transaction, keypair: &Keypair) -> Result
                 }
             }
             Err(e) => {
-                tracing::warn!(target="trade", "rpc {url} send error: {e}");
+                tracing::warn!(target = "trade", "rpc {url} send error: {e}");
             }
         }
     }
@@ -183,13 +183,13 @@ fn sign_and_send(urls: &[String], tx: &Transaction, keypair: &Keypair) -> Result
 async fn build_oco(client: &RpcClient, keypair: &Keypair, mint: &str) -> Result<(SwapTx, SwapTx)> {
     // TP route (sell) --------------------------------------------------------------------
     let tp_tx = fetch_swap_tx(client, keypair, mint).await.unwrap_or_else(|_| {
-        tracing::warn!(target="trade", "TP construction failed – using noop tx");
+        tracing::warn!(target = "trade", "TP construction failed – using noop tx");
         SwapTx { tx: fallback_transfer_tx(client, keypair).expect("transfer tx"), price: 0.0 }
     });
 
     // SL route (sell) --------------------------------------------------------------------
     let sl_tx = fetch_swap_tx(client, keypair, mint).await.unwrap_or_else(|_| {
-        tracing::warn!(target="trade", "SL construction failed – using noop tx");
+        tracing::warn!(target = "trade", "SL construction failed – using noop tx");
         SwapTx { tx: fallback_transfer_tx(client, keypair).expect("transfer tx"), price: 0.0 }
     });
 
@@ -202,7 +202,11 @@ pub async fn run(mut rx: Receiver<LaunchEvent>, slip_tx: tokio::sync::mpsc::Send
     // Initialise once outside the loop.
     let rpc = RpcClient::new_with_commitment(rpc_url(), CommitmentConfig::processed());
     let keypair = Keypair::new();
-    tracing::info!(target = "trade", "Generated ephemeral dev-net keypair: {}", keypair.pubkey());
+    tracing::info!(
+        target = "trade",
+        "Generated ephemeral dev-net keypair: {}",
+        keypair.pubkey()
+    );
 
     // Fund the account – devnet & local validator honour airdrops. Ignore errors on rate-limit.
     if let Ok(sig) = rpc.request_airdrop(&keypair.pubkey(), 1_000_000_000) {
@@ -220,7 +224,10 @@ pub async fn run(mut rx: Receiver<LaunchEvent>, slip_tx: tokio::sync::mpsc::Send
         let buy_swap = match fetch_swap_tx(&rpc, &keypair, &ev.mint).await {
             Ok(t) => t,
             Err(e) => {
-                tracing::warn!(target = "trade", "swap construction failed – falling back: {e}");
+                tracing::warn!(
+                    target = "trade",
+                    "swap construction failed – falling back: {e}"
+                );
                 SwapTx { tx: fallback_transfer_tx(&rpc, &keypair)?, price: 0.0 }
             }
         };
@@ -251,12 +258,12 @@ pub async fn run(mut rx: Receiver<LaunchEvent>, slip_tx: tokio::sync::mpsc::Send
         // --- TP leg -------------------------------------------------------
         let tp_sig = sign_and_send(&rpc_urls, &tp_swap.tx, &keypair)?;
         inc_trades_submitted();
-        tracing::info!(target="trade", "TP leg submitted: {tp_sig}");
+        tracing::info!(target = "trade", "TP leg submitted: {tp_sig}");
 
         // --- SL leg -------------------------------------------------------
         let sl_sig = sign_and_send(&rpc_urls, &sl_swap.tx, &keypair)?;
         inc_trades_submitted();
-        tracing::info!(target="trade", "SL leg submitted: {sl_sig}");
+        tracing::info!(target = "trade", "SL leg submitted: {sl_sig}");
 
         // We do *not* wait for confirmations here – the two orders race each
         // other and one will eventually settle the position.  Whichever wins
