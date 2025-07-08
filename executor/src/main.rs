@@ -22,7 +22,7 @@ struct Cli {
     /// Solana RPC URL to use (overrides SOLANA_RPC_URL env var)
     #[arg(long, env = "SOLANA_RPC_URL")]
     solana_url: Option<String>,
-    
+
     #[command(subcommand)]
     command: Option<Commands>,
 }
@@ -30,7 +30,7 @@ struct Cli {
 #[derive(Subcommand)]
 enum Commands {
     /// Replay mode for testing with mock data
-    /// 
+    ///
     /// This mode loads historical trading events from a JSON file and processes
     /// them without connecting to live market feeds. Useful for testing and
     /// backtesting trading strategies.

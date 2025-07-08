@@ -42,7 +42,9 @@ jobs:
 
         # Add the CLI to the PATH for the rest of the job.
         echo "$HOME/.local/share/solana/active_release/bin" >> "$GITHUB_PATH"
-        solana --version
+    
+    - name: Verify Solana CLI installation
+      run: solana --version
 
     # ──────────────────────────────  CACHES  ───────────────────────────────
     - name: Cache Cargo registry / git
