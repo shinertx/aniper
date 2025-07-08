@@ -24,7 +24,10 @@ async fn main() -> Result<()> {
     let (kill_tx, mut kill_rx) = tokio::sync::broadcast::channel(16);
     tokio::spawn(async move {
         if let Err(e) = risk::run(kill_tx, slip_rx).await {
-            tracing::error!(target = "risk", "risk module exited: {e}");
+            tracing::error!(
+                target = "risk",
+                "risk module exited: {e}"
+            );
         }
     });
 
@@ -40,7 +43,11 @@ async fn main() -> Result<()> {
                 KillSwitch::Slippage => "slippage",
             };
             metrics::inc_killswitch(label);
-            tracing::error!(target = "killswitch", "CRITICAL kill-switch triggered: {:?}", kind);
+            tracing::error!(
+                target = "killswitch",
+                "CRITICAL kill-switch triggered: {:?}",
+                kind
+            );
             sleep(Duration::from_millis(100)).await;
             std::process::exit(1);
         }
