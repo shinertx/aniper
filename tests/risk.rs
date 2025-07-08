@@ -2,6 +2,9 @@ use executor::risk::{self, KillSwitch};
 use metrics_exporter_prometheus::PrometheusBuilder;
 use tokio::sync::{broadcast, mpsc};
 use tokio::time::{timeout, Duration};
+use tempfile::NamedTempFile;
+use solana_sdk::signature::Keypair;
+use solana_sdk::signature::write_keypair_file;
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn equity_floor_breach_emits_killswitch() {
@@ -40,12 +43,9 @@ async fn equity_floor_breach_emits_killswitch() {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn equity_floor_rpc_balance() {
-    use tempfile::NamedTempFile;
-    use solana_sdk::signature::{Keypair, Signer};
-
     let kp = Keypair::new();
     let mut file = NamedTempFile::new().unwrap();
-    solana_sdk::signature::write_keypair_file(&kp, file.path()).unwrap();
+    write_keypair_file(&kp, file.path()).unwrap();
     std::env::set_var("KEYPAIR_PATH", file.path());
 
     // Poll quickly and set override low via mock balance.

@@ -3,6 +3,8 @@ use executor::ws_feed::LaunchEvent;
 use tokio::sync::mpsc;
 use std::process::{Command, Stdio};
 use std::time::Duration;
+use tempfile::NamedTempFile;
+use solana_sdk::signature::{Keypair, write_keypair_file};
 
 /// Helper to start a local `solana-test-validator`. Skips the test if the binary
 /// is not available in the current PATH.
@@ -31,6 +33,12 @@ fn start_test_validator() -> Option<std::process::Child> {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn trade_flow_confirmed() {
+    // Prepare temporary keypair file and set KEYPAIR_PATH.
+    let kp = Keypair::new();
+    let tmp = NamedTempFile::new().expect("tmp file");
+    write_keypair_file(&kp, tmp.path()).expect("write keypair");
+    std::env::set_var("KEYPAIR_PATH", tmp.path());
+
     // Spin up local validator (skip if unavailable).
     let validator = match start_test_validator() {
         Some(v) => v,

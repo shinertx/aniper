@@ -4,6 +4,8 @@ use metrics_exporter_prometheus::PrometheusBuilder;
 use tokio::sync::mpsc;
 use std::process::{Command, Stdio};
 use std::time::Duration;
+use tempfile::NamedTempFile;
+use solana_sdk::signature::{Keypair, write_keypair_file};
 
 /// Start a local `solana-test-validator`. Skips the test if binary missing.
 fn start_test_validator() -> Option<std::process::Child> {
@@ -33,6 +35,12 @@ fn start_test_validator() -> Option<std::process::Child> {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn oco_two_orders_and_slippage_sample() {
+    // Prepare temporary keypair file for signer.
+    let kp = Keypair::new();
+    let tmp = NamedTempFile::new().expect("tmp file");
+    write_keypair_file(&kp, tmp.path()).expect("write keypair");
+    std::env::set_var("KEYPAIR_PATH", tmp.path());
+
     // Spin validator.
     let validator = match start_test_validator() {
         Some(v) => v,

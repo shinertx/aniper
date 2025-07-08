@@ -9,7 +9,7 @@ use reqwest::Client;
 use solana_client::rpc_client::RpcClient;
 use solana_sdk::{
     commitment_config::CommitmentConfig,
-    signature::{Keypair, Signature, Signer},
+    signature::{Keypair, Signature, Signer, read_keypair_file},
     system_instruction,
     transaction::Transaction,
     compute_budget::ComputeBudgetInstruction,
@@ -201,8 +201,28 @@ async fn build_oco(client: &RpcClient, keypair: &Keypair, mint: &str) -> Result<
 pub async fn run(mut rx: Receiver<LaunchEvent>, slip_tx: tokio::sync::mpsc::Sender<f64>) -> Result<()> {
     // Initialise once outside the loop.
     let rpc = RpcClient::new_with_commitment(rpc_url(), CommitmentConfig::processed());
-    let keypair = Keypair::new();
-    tracing::info!(target = "trade", "Generated ephemeral dev-net keypair: {}", keypair.pubkey());
+
+    // ------------------------------------------------------------------
+    // Secure signer loading --------------------------------------------------
+    // ------------------------------------------------------------------
+    // Production deployments store the hot-wallet keypair in Cloud KMS / Secret
+    // Manager and surface it to the executor as a decrypted file path via the
+    // `KEYPAIR_PATH` environment variable.  We abort early if the variable is
+    // missing or the file cannot be parsed – running with a fresh key would be
+    // catastrophic on main-net.
+    //
+    // Tests create a temporary keypair file and set `KEYPAIR_PATH`, so this
+    // logic is fully covered in CI.
+    let keypair = match std::env::var("KEYPAIR_PATH") {
+        Ok(p) => read_keypair_file(&p)
+            .map_err(|e| anyhow!(format!("failed to load keypair from {p}: {e}")))?,
+        Err(_) => {
+            return Err(anyhow!(
+                "KEYPAIR_PATH not set – refusing to start; see README 'Security Controls'."
+            ))
+        }
+    };
+    tracing::info!(target = "trade", "Loaded trading keypair: {}", keypair.pubkey());
 
     // Fund the account – devnet & local validator honour airdrops. Ignore errors on rate-limit.
     if let Ok(sig) = rpc.request_airdrop(&keypair.pubkey(), 1_000_000_000) {

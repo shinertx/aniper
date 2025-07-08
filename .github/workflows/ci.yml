@@ -16,6 +16,7 @@ jobs:
         with:
           toolchain: stable
           override: true
+          components: rustfmt, clippy
 
       - name: Install Solana
         run: |

@@ -133,6 +133,7 @@ pub async fn run(kill_tx: Sender<KillSwitch>, mut slippage_rx: Receiver<f64>) ->
         let mut ema = 0.0_f64;
         let mut ema2 = 0.0_f64;
         let mut initialised = false;
+        let mut sample_count: usize = 0;
         let mut k = redis_f64("risk:slip_k").await.unwrap_or(2.0);
 
         while let Some(slip) = slippage_rx.recv().await {
@@ -146,6 +147,8 @@ pub async fn run(kill_tx: Sender<KillSwitch>, mut slippage_rx: Receiver<f64>) ->
                 ema2 = alpha * slip * slip + (1.0 - alpha) * ema2;
             }
 
+            sample_count += 1;
+
             let var = (ema2 - ema * ema).max(0.0);
             let std_dev = var.sqrt();
 
@@ -158,8 +161,10 @@ pub async fn run(kill_tx: Sender<KillSwitch>, mut slippage_rx: Receiver<f64>) ->
             set_risk_slippage_threshold(threshold);
             set_risk_last_slippage(slip);
 
-            // Breach condition (tail event).
-            if slip < -threshold && threshold > 0.0 {
+            // Breach condition (tail event) – only enforce once we have
+            // collected a minimal history to avoid triggering on the very
+            // first trade.
+            if sample_count >= 5 && slip < -threshold && threshold > 0.0 {
                 let _ = kill_tx.send(KillSwitch::Slippage);
             }
         }

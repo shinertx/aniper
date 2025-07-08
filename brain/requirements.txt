@@ -3,7 +3,6 @@ asyncio
 pandas
 pyarrow
 lightgbm
-wasm-exporter
 numpy
 pyyaml
 httpx

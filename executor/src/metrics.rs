@@ -1,9 +1,16 @@
 use metrics_exporter_prometheus::PrometheusBuilder;
 use std::net::SocketAddr;
+use base64::engine::general_purpose::STANDARD as BASE64_STD;
+use base64::Engine;
 
 pub fn serve_prometheus() {
     let builder = PrometheusBuilder::new();
     let handle = builder.install_recorder().expect("metrics recorder");
+    // Optional Basic Auth header – format USER:PASS → "Basic <base64>".
+    let auth_header = std::env::var("METRICS_BASIC_AUTH").ok().map(|raw| {
+        let token = BASE64_STD.encode(raw);
+        format!("Basic {token}")
+    });
     std::thread::spawn(move || {
         let addr: SocketAddr = std::env::var("METRICS_BIND")
             .unwrap_or_else(|_| "127.0.0.1:9184".into())
@@ -12,10 +19,23 @@ pub fn serve_prometheus() {
         hyper::Server::bind(&addr)
             .serve(hyper::service::make_service_fn(move |_| {
                 let handle = handle.clone();
+                let auth_header = auth_header.clone();
                 async move {
-                    Ok::<_, hyper::Error>(hyper::service::service_fn(move |_req| {
+                    Ok::<_, hyper::Error>(hyper::service::service_fn(move |req| {
                         let handle = handle.clone();
+                        let auth_header = auth_header.clone();
                         async move {
+                            // Enforce auth if configured.
+                            if let Some(expected) = auth_header {
+                                match req.headers().get(hyper::header::AUTHORIZATION) {
+                                    Some(h) if h.to_str().ok() == Some(&expected) => {},
+                                    _ => {
+                                        return Ok::<_, hyper::Error>(hyper::Response::builder()
+                                            .status(hyper::StatusCode::UNAUTHORIZED)
+                                            .body("unauthorized".into())?);
+                                    }
+                                }
+                            }
                             let body = handle.render();
                             Ok::<_, hyper::Error>(hyper::Response::new(body.into()))
                         }

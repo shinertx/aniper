@@ -45,7 +45,7 @@ export STATIC_IP="35.235.x.x"
 export KMS_KEY_RING="sniper-ring"
 export KMS_KEY="sniper-key"
 export WALLET_CSV_PATH="gs://${GCP_PROJECT_ID}-secrets/wallets.csv"
-export REDIS_URL="redis://:password@host:6379/0"
+export REDIS_URL="rediss://:password@host:6379/0"
 export METRICS_BIND="127.0.0.1:9184"
 
 # bootstrap infra
