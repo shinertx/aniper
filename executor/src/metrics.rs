@@ -63,7 +63,24 @@ pub fn serve_prometheus() {
     });
 }
 
+// --- Risk metrics helpers --------------------------------------------------
+pub fn set_risk_equity_usdc(_bal: f64) {
+    metrics::gauge!("risk_equity_usdc", _bal);
+}
+pub fn set_risk_last_slippage(_slip: f64) {
+    metrics::gauge!("risk_last_slippage", _slip);
+}
+pub fn set_risk_slippage_threshold(_threshold: f64) {
+    metrics::gauge!("risk_slippage_threshold", _threshold);
+}
+
 // --- Trade metrics helpers -------------------------------------------------
+pub fn inc_trades_confirmed() {
+    metrics::increment_counter!("trades_confirmed");
+}
+pub fn inc_trades_submitted() {
+    metrics::increment_counter!("trades_submitted");
+}
 
 /// Increment the killswitch counter for the provided `kind` label.
 /// Leaks a couple of &'static strs on purpose (trivial).
