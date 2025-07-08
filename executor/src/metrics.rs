@@ -40,7 +40,7 @@ pub fn serve_prometheus() {
                                         hyper::Response::builder()
                                             .status(hyper::StatusCode::UNAUTHORIZED)
                                             // FIX: no `?` (avoid From/Into mismatch)
-                                            .body("unauthorized".into())
+                                            .body::<String>("unauthorized".to_string())
                                             .unwrap(),
                                     );
                                 }

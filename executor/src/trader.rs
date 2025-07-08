@@ -165,7 +165,7 @@ fn sign_and_send(urls: &[String], tx: &Transaction, keypair: &Keypair) -> Result
     // fiddly.
     let final_tx = if tip_lamports > 0 {
         let blockhash = RpcClient::new(urls.first().unwrap().clone()).get_latest_blockhash()?;
-        let mut ixs = vec![ComputeBudgetInstruction::set_compute_unit_price(
+        let ixs = vec![ComputeBudgetInstruction::set_compute_unit_price(
             tip_lamports,
         )];
         // We cannot easily de-compile the existing compiled instructions back
