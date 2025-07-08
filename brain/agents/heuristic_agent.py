@@ -27,7 +27,9 @@ try:
 except ImportError:  # pragma: no cover
     def export_model(model, feature_names):  # noqa: D401
         """Fallback no-op exporter used in tests when wasm_exporter is absent."""
-        import tempfile, pickle, pathlib
+        import tempfile
+        import pickle
+        import pathlib
         tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".wasm")
         pickle.dump((model, feature_names), tmp)
         tmp.close()
@@ -134,4 +136,4 @@ def produce() -> tuple[str, str]:
 
 
 if __name__ == "__main__":
-    main() 
+    main()
