@@ -39,11 +39,14 @@ async fn trade_flow_confirmed() {
 
     // Point interactor at local node.
     std::env::set_var("SOLANA_RPC_URL", "http://127.0.0.1:8899");
-    std::env::set_var("JUPITER_SWAP_API", &mockito::server_url());
+    std::env::set_var("JUPITER_API", &mockito::server_url());
 
-    // Mock Jupiter endpoint to return dummy, easily-deserialisable tx bytes (will fail and fallback).
-    let _m = mockito::mock("GET", "/")
-        .with_status(500) // force fallback
+    // Mock new Jupiter endpoints to force fallback path.
+    let _m_quote = mockito::mock("GET", "/quote")
+        .with_status(500)
+        .create();
+    let _m_swap = mockito::mock("GET", "/swap")
+        .with_status(500)
         .create();
 
     let (tx, rx) = mpsc::channel(1);
