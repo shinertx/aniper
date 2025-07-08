@@ -1,0 +1,22 @@
+name: CI
+on: [push, pull_request]
+
+jobs:
+  build-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+      - name: Install Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+      - name: Cargo tests
+        run: cargo test --all --release --verbose
+      - name: Python tests
+        run: |
+          pip install -r brain/requirements.txt pytest
+          pytest -q 
