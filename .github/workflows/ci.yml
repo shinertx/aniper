@@ -32,6 +32,8 @@ jobs:
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
 
       - run: cargo fmt --check
+      - name: Install ruff
+        run: pip install ruff
       - run: ruff check src/
       - run: cargo clippy --all-targets --all-features -- -D warnings
       - run: cargo test --all --release
