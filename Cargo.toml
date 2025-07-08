@@ -1,5 +1,6 @@
 [workspace]
 members = ["executor"]
+resolver = "2"
 
 # Patch to reconcile Solana 1.18 (zeroize <1.4) with reqwest/rustls (zeroize 1.6).
 # Until Solana updates, we force the lower version universally.
