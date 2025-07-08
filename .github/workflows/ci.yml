@@ -41,7 +41,7 @@ jobs:
         fi
 
         # Add the CLI to the PATH for the rest of the job.
-        echo "$HOME/.local/share/solana/install/active_release/bin" >> "$GITHUB_PATH"
+        echo "$HOME/.local/share/solana/active_release/bin" >> "$GITHUB_PATH"
         solana --version
 
     # ──────────────────────────────  CACHES  ───────────────────────────────
