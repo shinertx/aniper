@@ -88,3 +88,7 @@ pub fn inc_killswitch(kind: &str) {
     let k: &'static str = Box::leak(kind.to_owned().into_boxed_str());
     metrics::increment_counter!("killswitch_total", "kind" => k);
 }
+
+pub fn inc_restart() {
+    metrics::increment_counter!("restarts");
+}

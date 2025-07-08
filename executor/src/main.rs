@@ -20,7 +20,7 @@ URL Configuration Priority:
 5. Default: https://api.devnet.solana.com")]
 struct Cli {
     /// Solana RPC URL to use (overrides SOLANA_RPC_URL env var)
-    #[arg(long, env = "SOLANA_RPC_URL")]
+    #[arg(long)]
     solana_url: Option<String>,
 
     #[command(subcommand)]
@@ -115,6 +115,6 @@ async fn main() -> Result<()> {
     });
 
     metrics::serve_prometheus();
-    futures::future::pending::<()>().await;
+    std::future::pending::<()>().await;
     Ok(())
 }
