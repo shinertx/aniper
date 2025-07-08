@@ -1,7 +1,7 @@
-use tokio::sync::mpsc::Sender;
-use serde::Deserialize;
-use tokio_tungstenite::{connect_async, tungstenite::Message};
 use futures_util::StreamExt;
+use serde::Deserialize;
+use tokio::sync::mpsc::Sender;
+use tokio_tungstenite::{connect_async, tungstenite::Message};
 use tracing::warn;
 
 #[derive(Debug, Deserialize)]
@@ -17,7 +17,11 @@ const MAX_MSG_LEN: usize = 4_096;
 /// Validate and parse raw websocket text into LaunchEvent.
 pub fn normalise_message(raw: &str) -> Option<LaunchEvent> {
     if raw.len() > MAX_MSG_LEN {
-        warn!(target="ws_feed", "dropping oversized frame: {} bytes", raw.len());
+        warn!(
+            target = "ws_feed",
+            "dropping oversized frame: {} bytes",
+            raw.len()
+        );
         return None;
     }
     serde_json::from_str::<LaunchEvent>(raw).ok()
@@ -30,7 +34,7 @@ pub async fn run(tx: Sender<LaunchEvent>) -> Result<()> {
         let (ws, _) = match connect_async(url).await {
             Ok(v) => v,
             Err(e) => {
-                warn!(target="ws_feed", "connect error: {e}");
+                warn!(target = "ws_feed", "connect error: {e}");
                 tokio::time::sleep(Duration::from_secs(1)).await;
                 continue;
             }
@@ -45,7 +49,7 @@ pub async fn run(tx: Sender<LaunchEvent>) -> Result<()> {
                 }
                 Ok(Message::Close(_)) => break,
                 Err(e) => {
-                    warn!(target="ws_feed", "stream error: {e}");
+                    warn!(target = "ws_feed", "stream error: {e}");
                     break;
                 }
                 _ => {}
@@ -53,4 +57,4 @@ pub async fn run(tx: Sender<LaunchEvent>) -> Result<()> {
         }
         tokio::time::sleep(Duration::from_secs(1)).await;
     }
-} 
+}

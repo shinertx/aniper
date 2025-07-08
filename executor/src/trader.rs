@@ -1,18 +1,18 @@
-use anyhow::{Result, anyhow};
-use tokio::sync::mpsc::Receiver;
 use super::classifier::score;
+use super::metrics::{inc_trades_confirmed, inc_trades_submitted};
 use super::ws_feed::LaunchEvent;
+use anyhow::{anyhow, Result};
 use std::time::Duration;
-use super::metrics::{inc_trades_submitted, inc_trades_confirmed};
+use tokio::sync::mpsc::Receiver;
 
 use reqwest::Client;
 use solana_client::rpc_client::RpcClient;
 use solana_sdk::{
     commitment_config::CommitmentConfig,
-    signature::{Keypair, Signature, Signer, read_keypair_file},
+    compute_budget::ComputeBudgetInstruction,
+    signature::{read_keypair_file, Keypair, Signature, Signer},
     system_instruction,
     transaction::Transaction,
-    compute_budget::ComputeBudgetInstruction,
 };
 
 /// Maximum number of slots to wait for a confirmation before giving up.
@@ -111,7 +111,8 @@ async fn fetch_swap_tx(client: &RpcClient, keypair: &Keypair, output_mint: &str)
 fn fallback_transfer_tx(client: &RpcClient, keypair: &Keypair) -> Result<Transaction> {
     let blockhash = client.get_latest_blockhash()?;
     let ix = system_instruction::transfer(&keypair.pubkey(), &keypair.pubkey(), 0);
-    let tx = Transaction::new_signed_with_payer(&[ix], Some(&keypair.pubkey()), &[keypair], blockhash);
+    let tx =
+        Transaction::new_signed_with_payer(&[ix], Some(&keypair.pubkey()), &[keypair], blockhash);
     Ok(tx)
 }
 
@@ -124,7 +125,11 @@ fn wait_for_confirmation(client: &RpcClient, sig: &Signature) -> Result<()> {
         }
         let current = client.get_slot()?;
         if current.saturating_sub(start_slot) > MAX_CONFIRMATION_SLOTS {
-            return Err(anyhow!("transaction {} not confirmed within {} slots", sig, MAX_CONFIRMATION_SLOTS));
+            return Err(anyhow!(
+                "transaction {} not confirmed within {} slots",
+                sig,
+                MAX_CONFIRMATION_SLOTS
+            ));
         }
         std::thread::sleep(Duration::from_millis(400));
     }
@@ -134,19 +139,29 @@ fn wait_for_confirmation(client: &RpcClient, sig: &Signature) -> Result<()> {
 /// configured RPC endpoints.  Returns the signature from the primary RPC.
 fn sign_and_send(urls: &[String], tx: &Transaction, keypair: &Keypair) -> Result<Signature> {
     // Determine tip in micro-lamports per CU.
-    let tip_lamports: u64 = std::env::var("TRADE_TIP").ok().and_then(|v| v.parse().ok()).unwrap_or(0);
+    let tip_lamports: u64 = std::env::var("TRADE_TIP")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(0);
 
     // If a tip is requested, prepend a compute-budget ix.  We rebuild the
     // transaction instructions because mutating an already-compiled message is
     // fiddly.
     let final_tx = if tip_lamports > 0 {
         let blockhash = RpcClient::new(urls.first().unwrap().clone()).get_latest_blockhash()?;
-        let mut ixs = vec![ComputeBudgetInstruction::set_compute_unit_price(tip_lamports)];
+        let mut ixs = vec![ComputeBudgetInstruction::set_compute_unit_price(
+            tip_lamports,
+        )];
         // We cannot easily de-compile the existing compiled instructions back
         // into `Instruction`, so the safest option is to **submit two
         // separate transactions**: the tip stub followed by the original tx.
         // For now we opt for the simple route – tip stub.
-        let tip_tx = Transaction::new_signed_with_payer(&ixs, Some(&keypair.pubkey()), &[keypair], blockhash);
+        let tip_tx = Transaction::new_signed_with_payer(
+            &ixs,
+            Some(&keypair.pubkey()),
+            &[keypair],
+            blockhash,
+        );
         // Broadcast tip first but ignore errors (non-supported rpc versions).
         for url in urls {
             let rpc = RpcClient::new(url.clone());
@@ -169,7 +184,7 @@ fn sign_and_send(urls: &[String], tx: &Transaction, keypair: &Keypair) -> Result
                 }
             }
             Err(e) => {
-                tracing::warn!(target="trade", "rpc {url} send error: {e}");
+                tracing::warn!(target = "trade", "rpc {url} send error: {e}");
             }
         }
     }
@@ -182,23 +197,36 @@ fn sign_and_send(urls: &[String], tx: &Transaction, keypair: &Keypair) -> Result
 /// transfers so latency tests remain unaffected.
 async fn build_oco(client: &RpcClient, keypair: &Keypair, mint: &str) -> Result<(SwapTx, SwapTx)> {
     // TP route (sell) --------------------------------------------------------------------
-    let tp_tx = fetch_swap_tx(client, keypair, mint).await.unwrap_or_else(|_| {
-        tracing::warn!(target="trade", "TP construction failed – using noop tx");
-        SwapTx { tx: fallback_transfer_tx(client, keypair).expect("transfer tx"), price: 0.0 }
-    });
+    let tp_tx = fetch_swap_tx(client, keypair, mint)
+        .await
+        .unwrap_or_else(|_| {
+            tracing::warn!(target = "trade", "TP construction failed – using noop tx");
+            SwapTx {
+                tx: fallback_transfer_tx(client, keypair).expect("transfer tx"),
+                price: 0.0,
+            }
+        });
 
     // SL route (sell) --------------------------------------------------------------------
-    let sl_tx = fetch_swap_tx(client, keypair, mint).await.unwrap_or_else(|_| {
-        tracing::warn!(target="trade", "SL construction failed – using noop tx");
-        SwapTx { tx: fallback_transfer_tx(client, keypair).expect("transfer tx"), price: 0.0 }
-    });
+    let sl_tx = fetch_swap_tx(client, keypair, mint)
+        .await
+        .unwrap_or_else(|_| {
+            tracing::warn!(target = "trade", "SL construction failed – using noop tx");
+            SwapTx {
+                tx: fallback_transfer_tx(client, keypair).expect("transfer tx"),
+                price: 0.0,
+            }
+        });
 
     Ok((tp_tx, sl_tx))
 }
 
 /// Core trade loop – consumes launch events and, when a positive classification is produced,
 /// executes a buy followed immediately by a sell.
-pub async fn run(mut rx: Receiver<LaunchEvent>, slip_tx: tokio::sync::mpsc::Sender<f64>) -> Result<()> {
+pub async fn run(
+    mut rx: Receiver<LaunchEvent>,
+    slip_tx: tokio::sync::mpsc::Sender<f64>,
+) -> Result<()> {
     // Initialise once outside the loop.
     let rpc = RpcClient::new_with_commitment(rpc_url(), CommitmentConfig::processed());
 
@@ -222,7 +250,11 @@ pub async fn run(mut rx: Receiver<LaunchEvent>, slip_tx: tokio::sync::mpsc::Send
             ))
         }
     };
-    tracing::info!(target = "trade", "Loaded trading keypair: {}", keypair.pubkey());
+    tracing::info!(
+        target = "trade",
+        "Loaded trading keypair: {}",
+        keypair.pubkey()
+    );
 
     // Fund the account – devnet & local validator honour airdrops. Ignore errors on rate-limit.
     if let Ok(sig) = rpc.request_airdrop(&keypair.pubkey(), 1_000_000_000) {
@@ -240,8 +272,14 @@ pub async fn run(mut rx: Receiver<LaunchEvent>, slip_tx: tokio::sync::mpsc::Send
         let buy_swap = match fetch_swap_tx(&rpc, &keypair, &ev.mint).await {
             Ok(t) => t,
             Err(e) => {
-                tracing::warn!(target = "trade", "swap construction failed – falling back: {e}");
-                SwapTx { tx: fallback_transfer_tx(&rpc, &keypair)?, price: 0.0 }
+                tracing::warn!(
+                    target = "trade",
+                    "swap construction failed – falling back: {e}"
+                );
+                SwapTx {
+                    tx: fallback_transfer_tx(&rpc, &keypair)?,
+                    price: 0.0,
+                }
             }
         };
 
@@ -271,12 +309,12 @@ pub async fn run(mut rx: Receiver<LaunchEvent>, slip_tx: tokio::sync::mpsc::Send
         // --- TP leg -------------------------------------------------------
         let tp_sig = sign_and_send(&rpc_urls, &tp_swap.tx, &keypair)?;
         inc_trades_submitted();
-        tracing::info!(target="trade", "TP leg submitted: {tp_sig}");
+        tracing::info!(target = "trade", "TP leg submitted: {tp_sig}");
 
         // --- SL leg -------------------------------------------------------
         let sl_sig = sign_and_send(&rpc_urls, &sl_swap.tx, &keypair)?;
         inc_trades_submitted();
-        tracing::info!(target="trade", "SL leg submitted: {sl_sig}");
+        tracing::info!(target = "trade", "SL leg submitted: {sl_sig}");
 
         // We do *not* wait for confirmations here – the two orders race each
         // other and one will eventually settle the position.  Whichever wins
@@ -290,9 +328,11 @@ pub async fn run(mut rx: Receiver<LaunchEvent>, slip_tx: tokio::sync::mpsc::Send
         let exit_price = tp_swap.price; // optimistic TP reference
         let slip_value = if entry_price > 0.0 && exit_price > 0.0 {
             (exit_price / entry_price) - 1.0
-        } else { 0.0 };
+        } else {
+            0.0
+        };
         let _ = slip_tx.send(slip_value).await; // ignore error if channel closed
     }
 
     Ok(())
-} 
+}

@@ -1,5 +1,5 @@
-pub mod ws_feed;
 pub mod classifier;
-pub mod trader;
+pub mod metrics;
 pub mod risk;
-pub mod metrics; 
+pub mod trader;
+pub mod ws_feed;
