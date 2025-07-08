@@ -6,13 +6,21 @@
 //    adaptive tail threshold based on a 20-period EMA of volatility.
 // ---------------------------------------------------------------------------
 
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use once_cell::sync::Lazy;
 use std::sync::atomic::{AtomicU64, Ordering};
 use tokio::sync::{broadcast::Sender, mpsc::Receiver};
 use tokio::time::{sleep, Duration};
+use solana_client::rpc_client::RpcClient;
+use solana_sdk::signature::read_keypair_file;
 
 use crate::metrics::{set_risk_equity_usdc, set_risk_last_slippage, set_risk_slippage_threshold};
+
+const LAMPORTS_PER_USDC: f64 = 1_000_000.0;
+
+fn rpc_url() -> String {
+    std::env::var("SOLANA_RPC_URL").unwrap_or_else(|_| "https://api.devnet.solana.com".to_string())
+}
 
 #[derive(Debug, Clone)]
 pub enum KillSwitch {
@@ -40,8 +48,19 @@ async fn get_balance_usdc() -> Result<f64> {
         return Ok(v);
     }
 
-    // TODO: wire real balance endpoint (broker API / on-chain view).
-    Ok(1_000.0) // stub – well above default equity floor
+    // Fallback to on-chain balance via RPC.
+    let path = std::env::var("KEYPAIR_PATH")
+        .map_err(|_| anyhow!("KEYPAIR_PATH not set"))?;
+
+    let rpc_url = rpc_url();
+    let lamports = tokio::task::spawn_blocking(move || {
+        let kp = read_keypair_file(path).map_err(|e| anyhow!(e.to_string()))?;
+        let rpc = RpcClient::new(rpc_url);
+        rpc.get_balance(&kp.pubkey()).map_err(|e| anyhow!(e.to_string()))
+    })
+    .await??;
+
+    Ok(lamports as f64 / LAMPORTS_PER_USDC)
 }
 
 // ---------------------------------------------------------------------------

@@ -5,7 +5,10 @@ pub fn serve_prometheus() {
     let builder = PrometheusBuilder::new();
     let handle = builder.install_recorder().expect("metrics recorder");
     std::thread::spawn(move || {
-        let addr: SocketAddr = "0.0.0.0:9184".parse().unwrap();
+        let addr: SocketAddr = std::env::var("METRICS_BIND")
+            .unwrap_or_else(|_| "127.0.0.1:9184".into())
+            .parse()
+            .expect("invalid METRICS_BIND address");
         hyper::Server::bind(&addr)
             .serve(hyper::service::make_service_fn(move |_| {
                 let handle = handle.clone();

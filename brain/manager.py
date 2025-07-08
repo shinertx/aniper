@@ -41,7 +41,9 @@ AGENTS: Dict[str, Dict[str, Any]] = {
     },
 }
 
-REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379")
+if "REDIS_URL" not in os.environ:
+    raise SystemExit("REDIS_URL environment variable required")
+REDIS_URL = os.environ["REDIS_URL"]
 
 # ---------------------------------------------------------------------------
 # Helpers --------------------------------------------------------------------
