@@ -88,7 +88,7 @@ async fn fetch_swap_tx(client: &RpcClient, keypair: &Keypair, output_mint: &str)
     let api = jupiter_api();
 
     // -- 1. Quote -----------------------------------------------------------
-    let quote_url = format!("{}/quote?inputMint={}&outputMint={}&amount=1000000&slippageBps=100&onlyDirectRoutes=false&platformFeeBps=0", api, USDC_MINT, output_mint);
+    let quote_url = format!("{api}/quote?inputMint={USDC_MINT}&outputMint={output_mint}&amount=1000000&slippageBps=100&onlyDirectRoutes=false&platformFeeBps=0");
     let _quote: QuoteResp = http.get(&quote_url).send().await?.json().await?;
     // For now we do not inspect the quote – the second call will embed
     // slippage & post-only enforcement.  Retaining for completeness.
@@ -96,7 +96,7 @@ async fn fetch_swap_tx(client: &RpcClient, keypair: &Keypair, output_mint: &str)
     // -- 2. Swap ------------------------------------------------------------
     // Jupiter swap endpoint requires the user public key so returned TX has us
     // as fee-payer.  The market makin' specifics are abstracted away.
-    let swap_url = format!("{}/swap?inputMint={}&outputMint={}&slippageBps=100&userPublicKey={}&wrapUnwrapSOL=true&feeBps=0", api, USDC_MINT, output_mint, keypair.pubkey());
+    let swap_url = format!("{api}/swap?inputMint={USDC_MINT}&outputMint={output_mint}&slippageBps=100&userPublicKey={user}&wrapUnwrapSOL=true&feeBps=0", user = keypair.pubkey());
 
     let resp: SwapResp = http.get(&swap_url).send().await?.json().await?;
     //  FIX: use BASE64_STD engine instead of deprecated base64::decode
