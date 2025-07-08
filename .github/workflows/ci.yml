@@ -34,12 +34,7 @@ jobs:
         if curl --retry 3 --retry-delay 5 -sSfL https://release.anza.xyz/stable/install | \
            bash -s -- init --data-dir "$HOME/.local/share/solana"; then
           echo "✅ Installed Solana via Anza stable"
-        
-        # 2. As a fallback, try the legacy Solana installer without any arguments.
-        elif curl --retry 3 --retry-delay 5 -sSfL https://release.solana.com/v1.18.8/install | \
-             bash -s --; then
-          echo "⚠️ Installed Solana via legacy v1.18.8 script"
-        
+      
         else
           echo "❌ Unable to install Solana CLI from either source" >&2
           exit 1
