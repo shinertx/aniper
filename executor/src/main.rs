@@ -40,7 +40,11 @@ async fn main() -> Result<()> {
                 KillSwitch::Slippage => "slippage",
             };
             metrics::inc_killswitch(label);
-            tracing::error!(target = "killswitch", "CRITICAL kill-switch triggered: {:?}", kind);
+            tracing::error!(
+                target = "killswitch",
+                "CRITICAL kill-switch triggered: {:?}",
+                kind
+            );
             sleep(Duration::from_millis(100)).await;
             std::process::exit(1);
         }
