@@ -47,7 +47,8 @@ async fn trade_flow_confirmed() {
         .create();
 
     let (tx, rx) = mpsc::channel(1);
-    let trader_handle = tokio::spawn(async move { trader::run(rx).await });
+    let (slip_tx, _slip_rx) = mpsc::channel(4);
+    let trader_handle = tokio::spawn(async move { trader::run(rx, slip_tx).await });
 
     let ev = LaunchEvent {
         mint: "TEST".into(),

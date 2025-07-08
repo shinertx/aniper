@@ -84,7 +84,7 @@ fn wait_for_confirmation(client: &RpcClient, sig: &Signature) -> Result<()> {
 
 /// Core trade loop – consumes launch events and, when a positive classification is produced,
 /// executes a buy followed immediately by a sell.
-pub async fn run(mut rx: Receiver<LaunchEvent>) -> Result<()> {
+pub async fn run(mut rx: Receiver<LaunchEvent>, slip_tx: tokio::sync::mpsc::Sender<f64>) -> Result<()> {
     // Initialise once outside the loop.
     let rpc = RpcClient::new_with_commitment(rpc_url(), CommitmentConfig::processed());
     let keypair = Keypair::new();
@@ -126,6 +126,12 @@ pub async fn run(mut rx: Receiver<LaunchEvent>) -> Result<()> {
         wait_for_confirmation(&rpc, &sell_sig)?;
         inc_trades_confirmed();
         tracing::info!(target = "trade", "Sell confirmed: {sell_sig}");
+
+        // -----------------------------------------------------------------
+        // Slippage reporting (placeholder – assumes 0% slip for fallback tx)
+        // -----------------------------------------------------------------
+        let slip_value = 0.0; // TODO: compute from exit_price / entry_price – 1
+        let _ = slip_tx.send(slip_value).await; // ignore error if channel closed
     }
 
     Ok(())
