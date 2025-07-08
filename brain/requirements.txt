@@ -1,2 +1,7 @@
 openai
-asyncio 
+asyncio
+pandas
+pyarrow
+lightgbm
+wasm-exporter
+numpy 
