@@ -1,0 +1,16 @@
+version: '3.8'
+services:
+  executor:
+    build: ./executor
+    image: aniper-executor
+    env_file: .env
+    restart: unless-stopped
+    ports:
+      - "9184:9184" # Prometheus metrics
+    depends_on:
+      - brain
+  brain:
+    build: ./brain
+    image: aniper-brain
+    env_file: .env
+    restart: unless-stopped
