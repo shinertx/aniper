@@ -1,0 +1,36 @@
+# Ignore environment variable files
+.env
+.env.*
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+
+# Rust build
+/target/
+
+# VSCode settings
+.vscode/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs and test output
+*.log
+ci_logs.txt
+bench_latency.json
+edge_metrics.csv
+
+# Python virtualenv
+.venv/
+venv/
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints/
+
+# Ignore secrets and credentials
+*.key
+*.pem
+*.crt
+wallets.csv
