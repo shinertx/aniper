@@ -98,7 +98,7 @@ async fn main() -> Result<()> {
         use executor::risk::KillSwitch;
         use tokio::time::{sleep, Duration};
 
-        while let Ok(kind) = kill_rx.recv().await {
+        if let Ok(kind) = kill_rx.recv().await {
             let label = match kind {
                 KillSwitch::EquityFloor => "equity_floor",
                 KillSwitch::Slippage => "slippage",
