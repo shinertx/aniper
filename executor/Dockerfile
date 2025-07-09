@@ -5,12 +5,13 @@ WORKDIR /app
 
 # 1. Cache dependencies
 COPY Cargo.toml Cargo.lock ./
-RUN mkdir src && echo "fn main() {}" > src/main.rs
+COPY executor/Cargo.toml executor/
+RUN mkdir executor/src && echo "fn main() {}" > executor/src/main.rs
 RUN cargo build --release
-RUN rm -rf src
+RUN rm -rf executor/src
 
 # 2. Copy source and build
-COPY . .
+COPY executor/ executor/
 RUN cargo build --release
 
 # ---- Runtime stage ----
