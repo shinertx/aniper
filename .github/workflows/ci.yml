@@ -99,3 +99,10 @@ jobs:
       run: |
         chmod +x ./scripts/replay_harness.sh
         ./scripts/replay_harness.sh --dry-run
+
+    # ──────────────────────────────  DOCKER BUILDS  ───────────────────────
+    - name: Build executor Docker image
+      run: docker build -t meme-executor -f executor/Dockerfile ./executor
+
+    - name: Build brain Docker image
+      run: docker build -t meme-brain -f brain/Dockerfile ./brain
