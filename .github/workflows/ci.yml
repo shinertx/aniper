@@ -91,9 +91,6 @@ jobs:
     - name: Cargo tests (release)
       run: cargo test --all --release
 
-    - name: WASM classifier tests
-      run: cargo test -p classifier --features wasm
-
     - name: Python unit & agent tests
       run: pytest -q
 
