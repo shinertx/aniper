@@ -1,6 +1,15 @@
 # ---- Build stage ----
-FROM rust:latest as builder
+FROM rust:1.77 as builder
+
 WORKDIR /app
+
+# 1. Cache dependencies
+COPY Cargo.toml Cargo.lock ./
+RUN mkdir src && echo "fn main() {}" > src/main.rs
+RUN cargo build --release
+RUN rm -rf src
+
+# 2. Copy source and build
 COPY . .
 RUN cargo build --release
 
