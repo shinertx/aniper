@@ -34,7 +34,12 @@ def _fetch_recent_tweets(minutes: int = 10, max_results: int = 100) -> List[str]
         return []
 
     endpoint = "https://api.twitter.com/2/tweets/search/recent"
-    query = "cat OR dog OR political OR retro lang:en -is:retweet"
+    # Updated query for DeFi/meme coin and crypto trends
+    query = (
+        "pepe OR doge OR shiba OR floki OR wojak OR bonk OR elon OR turbo OR dogwifhat OR jeo OR popcat OR catcoin OR mog OR pnd OR baby OR grok OR tate OR base OR blast "
+        "OR moon OR pump OR rug OR airdrop OR degen OR rekt OR gm OR wagmi OR lfg OR 100x OR ath OR scam OR presale OR launch OR trending OR viral "
+        "OR solana OR eth OR ethereum OR layerzero OR arbitrum OR optimism OR polygon OR bsc lang:en -is:retweet"
+    )
     since = (_dt.datetime.utcnow() - _dt.timedelta(minutes=minutes)).isoformat("T") + "Z"
     headers = {"Authorization": f"Bearer {TWITTER_BEARER}"}
     params = {"query": query, "max_results": max_results, "start_time": since, "tweet.fields": "text"}
