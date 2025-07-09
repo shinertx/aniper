@@ -4,21 +4,23 @@ FROM rust:1.77-slim as builder
 WORKDIR /app
 
 # 1. Cache dependencies
-COPY executor/Cargo.toml executor/Cargo.lock executor/
-RUN mkdir -p executor/src && echo "fn main() {}" > executor/src/main.rs
-RUN cd executor && cargo build --release
-RUN rm -rf executor/src
+COPY Cargo.toml Cargo.lock ./
+RUN mkdir -p src && echo "fn main() {}" > src/main.rs
+RUN cargo build --release
+RUN rm -rf src
 
 # 2. Copy source and build
-COPY executor/src executor/src
-# Copy any other files needed for build (optional, e.g. .env if needed at build time)
-# COPY executor/.env executor/.env
-RUN cd executor && cargo build --release
+COPY src ./src
+RUN cargo build --release
 
 # ---- Runtime stage ----
 FROM debian:bookworm-slim
 WORKDIR /app
 RUN apt-get update && apt-get install -y libssl3 ca-certificates && rm -rf /var/lib/apt/lists/*
-COPY --from=builder /app/executor/target/release/executor /usr/local/bin/executor
+COPY --from=builder /app/target/release/executor /usr/local/bin/executor
 ENV RUST_LOG=info
+EXPOSE 9184
+# Optional: use a non-root user for security
+# RUN useradd -m appuser && chown -R appuser /app
+# USER appuser
 CMD ["executor"]
