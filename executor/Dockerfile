@@ -17,6 +17,8 @@ RUN cargo build --release
 # ---- Runtime stage ----
 FROM debian:bookworm-slim
 WORKDIR /app
+# Install OpenSSL 3 and CA certificates for Rust binary
+RUN apt-get update && apt-get install -y libssl3 ca-certificates && rm -rf /var/lib/apt/lists/*
 COPY --from=builder /app/target/release/executor /usr/local/bin/executor
 ENV RUST_LOG=info
 CMD ["executor"]
