@@ -64,8 +64,12 @@ def _fetch_recent_tweets(minutes: int = 10, max_results: int = 100) -> List[str]
 
 
 def _score_narratives_heuristic(texts: List[str]) -> Dict[str, float]:
-    """Heuristic scoring: keyword frequency."""
-    categories = {"cat": 0, "dog": 0, "political": 0, "retro": 0}
+    """Heuristic scoring: keyword frequency for DeFi/meme/crypto trends."""
+    categories = {
+        "pepe": 0, "doge": 0, "shiba": 0, "floki": 0, "wojak": 0, "bonk": 0, "elon": 0, "turbo": 0, "dogwifhat": 0, "jeo": 0, "popcat": 0, "catcoin": 0, "mog": 0, "pnd": 0, "baby": 0, "grok": 0, "tate": 0, "base": 0, "blast": 0,
+        "moon": 0, "pump": 0, "rug": 0, "airdrop": 0, "degen": 0, "rekt": 0, "gm": 0, "wagmi": 0, "lfg": 0, "100x": 0, "ath": 0, "scam": 0, "presale": 0, "launch": 0, "trending": 0, "viral": 0,
+        "solana": 0, "eth": 0, "ethereum": 0, "layerzero": 0, "arbitrum": 0, "optimism": 0, "polygon": 0, "bsc": 0
+    }
     if not texts:
         return {k: 0.0 for k in categories}
     for txt in texts:
@@ -82,16 +86,21 @@ def _score_narratives_llm(texts: List[str]) -> Dict[str, float]:
     if not OPENAI_API_KEY:
         raise RuntimeError("USE_LLM=true but OPENAI_API_KEY is not set!")
     openai.api_key = OPENAI_API_KEY
-    prompt = f"Score the following tweets for these categories: ['cat', 'dog', 'political', 'retro']. Tweets: {json.dumps(texts)}. Return a JSON object with category keys and float values between 0 and 1."
+    categories = [
+        "pepe", "doge", "shiba", "floki", "wojak", "bonk", "elon", "turbo", "dogwifhat", "jeo", "popcat", "catcoin", "mog", "pnd", "baby", "grok", "tate", "base", "blast",
+        "moon", "pump", "rug", "airdrop", "degen", "rekt", "gm", "wagmi", "lfg", "100x", "ath", "scam", "presale", "launch", "trending", "viral",
+        "solana", "eth", "ethereum", "layerzero", "arbitrum", "optimism", "polygon", "bsc"
+    ]
+    prompt = f"Score the following tweets for these categories: {categories}. Tweets: {json.dumps(texts)}. Return a JSON object with category keys and float values between 0 and 1."
     response = openai.ChatCompletion.create(
         model="gpt-4",
         messages=[{"role": "user", "content": prompt}],
         temperature=0.2,
-        max_tokens=256,
+        max_tokens=512,
     )
     llm_call_total.labels(agent="narrative").inc()
     result = json.loads(response.choices[0].message.content)
-    return {k: round(float(result.get(k, 0)), 3) for k in ["cat", "dog", "political", "retro"]}
+    return {k: round(float(result.get(k, 0)), 3) for k in categories}
 
 
 def score_narratives(texts: List[str]) -> Dict[str, float]:
