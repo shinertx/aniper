@@ -1,133 +1,213 @@
-# README.md
-────────────────────────────────────────────────────────
-MEME-SNIPER POD — Turn \$1 000 → \$50 000 in 7 Days
-────────────────────────────────────────────────────────
+# MEME-SNIPER POD — $1,000 → $50,000 IN 7 DAYS
+
+---
 
 ## 1 | Executive Summary
-First-minute sniping of Solana/Base memecoin launches using:
-* **Rust executor** (sub-slot latency, multi-RPC broadcast)
-* **WASM micro-classifier** (offline-trained, in-memory scoring)
-* **LLM "brain" agents** (feature mining, narrative scoring, red-team)
-* **GCP stack** (GKE Autopilot, Cloud Build, Secret Manager, CloudSQL)
 
-Architecture guarantees **zero LLM calls in the micro-latency path**.
+Meme-Sniper Pod is a latency-optimized, agent-powered system for sniping first-block Solana/Base memecoin launches.
+
+- **Rust executor:** Ultra-fast, sub-slot, multi-RPC trading engine.
+- **WASM classifier:** Nightly-retrained model (hot-swappable, <1ms scoring).
+- **Python agent layer:** LLM-driven (feature miner, narrative, red-team, coach).
+- **Deployment:** Runs on any Linux VM, server, or Docker—**no Kubernetes or Terraform required**.
+- **Zero LLM calls in the latency path.**  
+  All models, guardrails, and kill-switches are enforced in-process.
 
 ---
 
 ## 2 | Repo Structure
-.
-├── executor/ # Rust HFT engine
-├── brain/ # Python agents (LLM calls)
-├── models/ # model.wasm (prod / candidate)
-├── infra/
-│ ├── terraform/ # GCP IaC
-│ └── k8s/ # GKE manifests
-├── shared/ # Protobuf, schemas, utils
-├── scripts/ # replay_harness, canary_test
-├── docs/ # PROMPTS.md, ARCHITECTURE.md
-└── AGENTS.md # Workflow constitution
 
-bash
-Copy
-Edit
+```
+.
+├── executor/         # Rust trading engine (core loop)
+│   └── Dockerfile    # Executor Docker image
+├── brain/            # Python LLM agent suite (logic/cron)
+│   └── Dockerfile    # Brain/agent Docker image
+├── models/           # WASM model artifacts (auto-created)
+├── scripts/          # replay_harness, canary_test, rotate_keys.sh
+├── docs/             # PROMPTS.md, AGENTS_GUIDE.md, run-books
+├── AGENTS.md         # Workflow, testing, and audit constitution
+├── .github/          # Copilot/CI configs
+├── infra/ (optional) # terraform/, k8s/ for advanced infra (optional)
+````
+> **Note:**  
+> `models/` is created automatically by the training agent if missing.  
+> `infra/` is only for users who want advanced IaC or Kubernetes.
 
 ---
 
-## 3 | Quick Start (GCP Provisioner Only)
+## 3 | Quick Start — Manual/Single-VM/Docker
+
+### **Option A: Native (VM/Bare Metal)**
+```bash
+# 1. Install dependencies (Ubuntu 22.04 recommended)
+sudo apt-get update && sudo apt-get install -y build-essential python3.11 python3.11-venv redis-server
+
+# 2. Clone and build
+git clone https://github.com/<your-org>/meme-sniper.git && cd meme-sniper
+cd executor && cargo build --release
+
+# 3. Prepare environment variables
+cp .env.example .env
+nano .env  # fill in all required API keys, RPC URLs, Redis URL, key paths
+
+# 4. Start Redis (localhost bind, password in redis.conf)
+sudo systemctl start redis-server
+sudo systemctl enable redis-server
+
+# 5. Start executor
+source ../.env
+./target/release/executor
+
+# 6. Start Python agent manager
+cd ../brain
+python3.11 -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt
+source ../.env
+python -m brain.manager
+````
+
+---
+
+### **Option B: Docker / Docker Compose (Recommended for Most Teams)**
+
+#### 1. Build Docker images
 
 ```bash
-# clone and cd
-git clone https://github.com/<you>/meme-sniper.git && cd meme-sniper
+# In repo root; note corrected Dockerfile paths!
+docker build -t meme-executor -f executor/Dockerfile ./executor
+docker build -t meme-brain -f brain/Dockerfile ./brain
+```
 
-# set env (replace placeholders)
-export GCP_PROJECT_ID="meme-snipe-01"
-export STATIC_IP="35.235.x.x"
-export KMS_KEY_RING="sniper-ring"
-export KMS_KEY="sniper-key"
-export WALLET_CSV_PATH="gs://${GCP_PROJECT_ID}-secrets/wallets.csv"
-export REDIS_URL="rediss://:password@host:6379/0"
-export METRICS_BIND="127.0.0.1:9184"
+#### 2. Start Redis in Docker (secure, localhost only)
 
-# bootstrap infra
-gcloud auth login
-terraform -chdir=infra/terraform init
-terraform -chdir=infra/terraform apply \
-  -var="project_id=${GCP_PROJECT_ID}" \
-  -var="exec_static_ip=${STATIC_IP}" \
-  -var="kms_key_ring=${KMS_KEY_RING}" \
-  -var="kms_key=${KMS_KEY}" \
-  -var="wallet_csv_path=${WALLET_CSV_PATH}"
-CI/CD pipeline in Cloud Build auto-deploys to GKE after every merge.
+```bash
+docker run -d --name redis \
+  -p 6379:6379 \
+  -e REDIS_PASSWORD=yourpassword \
+  redis:alpine --requirepass yourpassword --bind 127.0.0.1
+```
 
-4 | Operational Playbook
-Phase	Goal	Trigger
-Shadow	P&L ≥ -$20 on 1 000 replay trades	Post-deploy
-Canary	Live size $5, equity floor $950	Shadow pass
-Ramp	Ticket $50, equity floor $300	Canary ROI ≥ 0
-Scale	Cross-chain (Base) enabled	Week 2
+> On Mac/Windows, `--network host` may not be available. Use Docker Compose’s bridge network and adjust `REDIS_URL` as needed.
 
-Use make killswitch to halt instantly.
+#### 3. Run executor and agents
 
-5 | Telemetry
-Prometheus scrape /metrics from executor.
-Set `METRICS_BIND` to control the listening address (default `127.0.0.1:9184`).
+```bash
+docker run --env-file .env --network host meme-executor
+docker run --env-file .env --network host meme-brain
+```
 
-Key Prometheus counters now exported:
+> On non-Linux, prefer Docker Compose for networking.
 
-* `killswitch_total{kind="equity_floor|slippage"}` – counts forced shutdowns by guard kind.
-* `restarts_total` – monotonically tracks executor (re)starts across pod restarts.
+#### 4. (Optional) Use Docker Compose for one-command up
 
-Grafana dashboard dashboards/latency.json.
+```yaml
+# docker-compose.yml
+version: "3"
+services:
+  redis:
+    image: redis:alpine
+    command: ["redis-server", "--requirepass", "yourpassword", "--bind", "0.0.0.0"]
+    ports: ["6379:6379"]
+  executor:
+    build: ./executor
+    env_file: .env
+    depends_on: [redis]
+    ports: ["9184:9184"]  # Exposes metrics, adjust as needed
+  brain:
+    build: ./brain
+    env_file: .env
+    depends_on: [redis]
+```
 
-Cloud Monitoring alerts: p95 > 600 ms, equity < $350, slippage > 5 %.
-
-6 | Security Controls
-HSM-backed hot wallets (Cloud KMS).
-
-Nightly key rotation (see scripts/rotate_keys.sh).
-└── AGENTS.md            # Workflow constitution
-+    docs/AGENTS_GUIDE.md # LLM agent design & guardrails
-
-
-Supply-chain scan: cargo deny + pip-audit in CI.
-
-Secrets stored only in GCP Secret Manager; never in ENV at runtime.
-
-7 | Model Lifecycle
-Brain trains LightGBM nightly → models/candidate/model.wasm.
-
-canary_test.sh replay last 24 h; if ROI ↑ and JS-Div ≤ 0.25 → PR raised.
-
-Provisioner reviews edge_metrics.csv, then merges → promotion to prod.
-
-8 | Contribution Guide
-Read AGENTS.md first—merges are impossible without compliance.
-
-Fork → feature branch → PR.
-
-Attach logs & evidence artefacts; wait for Provisioner approval.
-
-9 | License
-MIT for code; models and prompts CC-BY-NC-4.0.
-
-10 | Contact
-Ops/PagerDuty: ops@meme-sniper.xyz
-
-Security: security@meme-sniper.xyz
-
-End of README.md
-
-yaml
-Copy
-Edit
+```bash
+docker compose up --build
+```
 
 ---
 
-### Complexity & Confidence  
-*Task complexity:* **Medium** (pure documentation).  
-*Confidence:* **0.93** – aligns exactly with all earlier specs and Codex-agent workflow guidance.
+## 4 | Security & Environment
 
-2/2
+* **Signer key:** Use `load_signer_from_kms()` or securely load a local key (`chmod 600`). Never hard-code keys in images/scripts.
+* **Redis:** Must be password protected. Never expose to public internet. Use localhost bind unless behind a VPN/firewall.
+* **Prometheus metrics:** Exported by the executor (`/metrics`, default `127.0.0.1:9184`). Expose only as needed; firewall/VPN strongly recommended.
+* **OFAC screening:** Compliance checks enforced before swaps (see AGENTS.md).
+* **No secrets in repo:** Always load from `.env` (not committed).
+* **.env.example** is provided—**keep it up to date** with all required variables.
+
+---
+
+## 5 | Agent & Model Lifecycle
+
+* **Heuristic agent:** Trains LightGBM nightly, exports WASM under `models/candidate/model.wasm` (folder auto-created).
+* **LLM agents (brain/):** Narrative, red-team, coach—cron-managed, publish artifacts to Redis.
+* **Model governance:** Canary tests, manifest SHA, merge-gate and manual sign-off.
+
+---
+
+## 6 | Operational Playbook
+
+| Phase  | Goal                            | How to run/test                |
+| ------ | ------------------------------- | ------------------------------ |
+| Shadow | P&L ≥ -$20 on 1,000 replay      | `./scripts/replay_harness.sh`  |
+| Canary | Live $5 trades, equity $950     | Manual run with small bankroll |
+| Ramp   | Ticket $50, equity $300         | Once canary ROI ≥ 0            |
+| Scale  | Add cross-chain/base (optional) | After week 1, if desired       |
+
+* Use `make killswitch` or set `global_halt=1` in Redis to halt instantly.
+
+---
+
+## 7 | Monitoring & Metrics
+
+* **Prometheus:** Scrapes `/metrics` from the **executor** service (see `METRICS_BIND`).
+* **Key metrics:** `killswitch_total`, `restarts_total`, `risk_equity_usdc`, `risk_last_slippage`.
+* **Alerting:** Trigger on kill-switch activation, equity < $350, or slippage > 5%.
+* **Grafana dashboards:** in `docs/dashboards/latency.json`.
+
+---
+
+## 8 | CI/CD & Testing
+
+* All PRs require passing:
+
+  * `cargo fmt --check`
+  * `cargo clippy --all-targets --all-features -- -D warnings`
+  * `cargo test --all --release`
+  * `pytest -q`
+  * `./scripts/replay_harness.sh --dry-run`
+* All merges require Provisioner sign-off.
+
+---
+
+## 9 | Contribution Guide
+
+* Read `AGENTS.md` and `docs/AGENTS_GUIDE.md` before changes.
+* Fork → feature branch → PR (with tests).
+* All code/docs must match `.github/copilot-instructions.md`.
+* Commit messages: `<scope>: imperative, ≤50 chars summary`.
+
+---
+
+## 10 | License
+
+MIT for code; models and prompts CC-BY-NC-4.0.
+
+---
+
+## 11 | Contact
+
+* **Ops:** [ops@meme-sniper.xyz](mailto:ops@meme-sniper.xyz)
+* **Security:** [security@meme-sniper.xyz](mailto:security@meme-sniper.xyz)
+
+---
+
+**No Kubernetes, GKE, or Terraform is required.**
+Deploy securely and with full edge on any VM or Docker host.
+
+For advanced automation or HA, see `infra/` (optional).
+
+---
 
 
 
