@@ -4,6 +4,7 @@ import json
 import os
 from typing import Any, Dict, Tuple
 
+import openai
 import yaml  # type: ignore
 
 # ---------------------------------------------------------------------------
@@ -11,23 +12,37 @@ import yaml  # type: ignore
 # ---------------------------------------------------------------------------
 
 
+USE_LLM = os.getenv("USE_LLM", "false").lower() == "true"
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+llm_call_total = 0  # Prometheus counter placeholder
+
+
 def suggest_guard_patches(current_filters: Dict[str, Any]) -> Dict[str, Any]:
-    """Produce patch suggestions for guard-rules.
+    """Produce patch suggestions for guard-rules, optionally using LLM."""
+    global llm_call_total
+    if USE_LLM and OPENAI_API_KEY:
+        try:
+            openai.api_key = OPENAI_API_KEY
+            prompt = f"Suggest YAML patch heuristics for these filters: {json.dumps(current_filters)}. Return a JSON object with a 'patches' key containing a list of patch dicts."
+            response = openai.ChatCompletion.create(
+                model="gpt-4",
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.2,
+                max_tokens=256,
+            )
+            llm_call_total += 1  # Increment Prometheus counter
+            result = json.loads(response.choices[0].message.content)
+            if "patches" in result:
+                return result
+        except Exception:
+            pass  # Fallback to heuristic below if LLM fails
 
-    The algorithm is deliberately simple: we look for well-known numeric guard
-    rails and tighten/loosen them based on heuristic multipliers.  In
-    production this would be the result of an LLM call with context, but the
-    placeholder keeps unit-tests deterministic and avoids OpenAI cost.
-    """
+    # Heuristic rule: adjust max_position by +10 % to widen risk buffer
     patches: list[dict[str, Any]] = []
-
-    # Example rule: adjust max_position by +10 % to widen risk buffer
     if (mp := current_filters.get("max_position")) and isinstance(mp, (int, float)):
         new_val = int(mp * 1.1)
         if new_val != mp:
             patches.append({"path": "/max_position", "operation": "replace", "value": new_val})
-
-    # More rules could be appended here …
 
     return {"patches": patches}
 
@@ -69,4 +84,4 @@ def main() -> None:  # pragma: no cover
 
 
 if __name__ == "__main__":
-    main() 
+    main()
