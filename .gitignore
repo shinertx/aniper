@@ -34,3 +34,4 @@ venv/
 *.pem
 *.crt
 wallets.csv
+feature_store.parquet
