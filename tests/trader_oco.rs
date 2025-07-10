@@ -43,7 +43,7 @@ async fn oco_two_orders_and_slippage_sample() {
     std::env::set_var("KEYPAIR_PATH", tmp.path());
 
     // Spin validator.
-    let validator = match start_test_validator() {
+    let mut validator = match start_test_validator() {
         Some(v) => v,
         None => return,
     };
