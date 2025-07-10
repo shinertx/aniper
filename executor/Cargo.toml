@@ -31,3 +31,35 @@ wat = "1"
 mockito = "1"
 which = "4"
 tempfile = "3"
+
+[[test]]
+name = "cli"
+path = "../tests/cli.rs"
+
+[[test]]
+name = "compliance"
+path = "../tests/compliance.rs"
+
+[[test]]
+name = "metrics"
+path = "../tests/metrics.rs"
+
+[[test]]
+name = "risk"
+path = "../tests/risk.rs"
+
+[[test]]
+name = "trader"
+path = "../tests/trader.rs"
+
+[[test]]
+name = "trader_oco"
+path = "../tests/trader_oco.rs"
+
+[[test]]
+name = "ws_feed"
+path = "../tests/ws_feed.rs"
+
+[[test]]
+name = "classifier"
+path = "../tests/classifier.rs"
