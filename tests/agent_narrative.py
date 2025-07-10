@@ -13,4 +13,9 @@ def test_score_narratives_basic():
     ]
     scores = score_narratives(tweets)
 
-    assert set(scores.keys()) == {"cat", "dog", "political", "retro"}
+    expected_keys = {
+        "pepe", "doge", "shiba", "floki", "wojak", "bonk", "elon", "turbo", "dogwifhat", "jeo", "popcat", "catcoin", "mog", "pnd", "baby", "grok", "tate", "base", "blast",
+        "moon", "pump", "rug", "airdrop", "degen", "rekt", "gm", "wagmi", "lfg", "100x", "ath", "scam", "presale", "launch", "trending", "viral",
+        "solana", "eth", "ethereum", "layerzero", "arbitrum", "optimism", "polygon", "bsc"
+    }
+    assert set(scores.keys()) == expected_keys
