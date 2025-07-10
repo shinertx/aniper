@@ -1,6 +1,9 @@
 # ---- Build stage ----
 FROM rust:latest as builder
 
+# Install build dependencies for TLS
+RUN apt-get update && apt-get install -y libssl-dev pkg-config && rm -rf /var/lib/apt/lists/*
+
 WORKDIR /app
 
 # 1. Cache dependencies
