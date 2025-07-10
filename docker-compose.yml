@@ -1,10 +1,27 @@
 version: '3.8'
 services:
+  redis:
+    image: redis:7.2-alpine
+    container_name: aniper-redis
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - aniper-net
+    restart: always
+
   executor:
     build:
       context: ./executor
       dockerfile: Dockerfile
     container_name: aniper-executor
+    dns:
+      - 8.8.8.8
+      - 1.1.1.1
     ports:
       - "9184:9184"
     environment:
@@ -22,7 +39,9 @@ services:
       retries: 3
 
   brain:
-    build: ./brain
+    build:
+      context: ./brain
+      dockerfile: Dockerfile
     image: aniper-brain
     env_file: .env
     restart: unless-stopped
@@ -31,19 +50,9 @@ services:
       - redis
     networks:
       - aniper-net
-
-  redis:
-    image: redis:7.2-alpine
-    container_name: aniper-redis
-    ports:
-      - "6379:6379"
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    networks:
-      - aniper-net
+    dns:
+      - 8.8.8.8
+      - 1.1.1.1
 
   prometheus:
     image: prom/prometheus:latest
