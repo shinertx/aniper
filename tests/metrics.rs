@@ -12,7 +12,7 @@ static HANDLE: Lazy<metrics_exporter_prometheus::PrometheusHandle> = Lazy::new(|
 #[test]
 fn prometheus_bind_respects_env() {
     std::env::set_var("METRICS_BIND", "127.0.0.1:0");
-    metrics::serve_prometheus();
+    tokio::spawn(metrics::serve_prometheus());
     std::thread::sleep(std::time::Duration::from_millis(50));
 }
 
@@ -59,4 +59,4 @@ fn extract_counter(body: &str, name: &str, label_filter: &str) -> Option<u64> {
         }
     }
     None
-} 
+}
