@@ -41,7 +41,7 @@ async fn trade_flow_confirmed() {
     std::env::set_var("KEYPAIR_PATH", tmp.path());
 
     // Spin up local validator (skip if unavailable).
-    let validator = match start_test_validator() {
+    let mut validator = match start_test_validator() {
         Some(v) => v,
         None => return,
     };
@@ -80,7 +80,7 @@ async fn trade_flow_confirmed() {
 
     // Clean up validator.
     let _ = validator.kill();
-} 
+}
 
 #[test]
 fn test_rpc_url_fallback() {

@@ -29,7 +29,7 @@ fn wasm_loader_rejects_bad_bytes() {
 #[test]
 fn wasm_loader_accepts_identity_module() {
     // minimal wasm module exporting an identity function
-    let wat = r#"(module (func (export \"identity\") (param i32) (result i32) local.get 0))"#;
+    let wat = r#"(module (func (export "identity") (param i32) (result i32) local.get 0))"#;
     let wasm_bytes = wat::parse_str(wat).expect("wat parse failed");
     assert!(load_wasm(&wasm_bytes).is_ok());
-} 
+}
