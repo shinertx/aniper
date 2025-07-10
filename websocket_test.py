@@ -1,1 +1,91 @@
-#!/usr/bin/env python3"""Trading System Test - Updated for Redis-enabled executorTests both WebSocket events and Redis trade signals with the new trading system."""import asyncioimport redisimport jsonimport timefrom datetime import datetimedef test_redis_trade_signal():    """Test the new Redis trade signal pathway"""    print("🎯 TESTING REDIS TRADE SIGNALS")    print("=" * 50)        try:        # Connect to Redis        r = redis.Redis(host='localhost', port=6379, decode_responses=True)        r.ping()        print("✅ Connected to Redis")                # Clear any old signals        r.delete('trade_signals')                # 1. Set up proper risk parameters for the updated system        print("📋 Setting up risk parameters...")        r.set('risk:equity_floor', '0.1')  # Low threshold for devnet        r.set('risk:max_position_size', '25')  # Higher for testing        r.set('risk:max_slippage', '5.0')  # 5% max slippage        r.set('global_halt', '0')  # Ensure trading is enabled        print("✅ Risk parameters configured")                # 2. Create a proper trade signal for the updated executor        print("📊 Creating enhanced trade signal...")        trade_signal = {            "action": "buy",            "mint": "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263",  # BONK            "amount_usdc": 10.0,  # $10 test trade            "max_slippage": 3.0,  # 3% slippage tolerance            "take_profit_pct": 1.25,  # 25% take profit            "stop_loss_pct": 0.80,    # 20% stop loss            "timestamp": datetime.now().isoformat(),            "source": "redis_test",            "creator": "TestRedisSignal",            "priority": "high"        }                # Push to the trade_signals queue that the executor now monitors        r.lpush('trade_signals', json.dumps(trade_signal))                print(f"✅ Enhanced trade signal created:")        print(f"   Token: BONK")        print(f"   Amount: ${trade_signal['amount_usdc']}")        print(f"   Take Profit: +{(trade_signal['take_profit_pct']-1)*100:.0f}%")        print(f"   Stop Loss: {(1-trade_signal['stop_loss_pct'])*100:.0f}%")        print(f"   Max Slippage: {trade_signal['max_slippage']}%")                return True            except Exception as e:        print(f"❌ Redis test failed: {e}")        return Falsedef monitor_execution():    """Monitor for trade execution with enhanced tracking"""    print(f"\n👁️ MONITORING FOR TRADE EXECUTION")    print("=" * 50)        r = redis.Redis(host='localhost', port=6379, decode_responses=True)        print("Watching for 60 seconds...")    start_time = time.time()    initial_signals = r.llen('trade_signals')        while time.time() - start_time < 60:        current_signals = r.llen('trade_signals')                # Check if signals are being consumed        if current_signals < initial_signals:            print(f"\n🎉 SIGNAL CONSUMED! {initial_signals} -> {current_signals}")            print("✅ Executor is processing Redis trade signals!")                    # Check for execution artifacts        keys = r.keys('*')        execution_keys = [k for k in keys if any(word in k.lower() for word in                          ['execution', 'transaction', 'trade_result', 'pnl', 'position'])]                if execution_keys:            print(f"\n🔍 Found execution artifacts: {execution_keys}")            for key in execution_keys:                try:                    value = r.get(key)                    print(f"  {key}: {value}")                except:                    print(f"  {key}: [list or complex type]")                elapsed = int(time.time() - start_time)        print(f"\r⏱️  {elapsed}s - Signals remaining: {current_signals}, Execution keys: {len(execution_keys)}", end='', flush=True)                time.sleep(3)        print(f"\n\n📊 Final Redis state:")    keys = r.keys('*')    for key in sorted(keys):        try:            key_type = r.type(key)            if key_type == 'list':                count = r.llen(key)                print(f"  {key} (list): {count} items")                if count > 0:                    latest = r.lindex(key, 0)                    if latest:                        print(f"    Latest: {latest[:100]}...")            elif key_type == 'string':                value = r.get(key)                print(f"  {key} (string): {value}")        except Exception as e:            print(f"  {key}: [error: {e}]")def main():    """Run the updated trading system test"""    print("🎯 ANIPER REDIS TRADING SYSTEM TEST")    print("=" * 70)    print(f"Timestamp: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")    print("Testing: Updated executor with Redis trade signal support")    print()        # Test Redis trading signals    if test_redis_trade_signal():        # Monitor for execution        monitor_execution()        print(f"\n📋 SYSTEM STATUS SUMMARY")    print("=" * 50)    print("✅ Redis trade signal pathway: IMPLEMENTED")    print("✅ Enhanced price calculation: IMPLEMENTED")     print("✅ OCO order fixes: IMPLEMENTED")    print("✅ Position sizing: IMPLEMENTED")    print("✅ Deduplication: IMPLEMENTED")    print()    print("💡 If signals are consumed but no execution artifacts appear:")    print("   1. Check executor logs: docker logs aniper-executor --tail 30")    print("   2. Check wallet balance: May need USDC funding")    print("   3. Check equity floor: May be triggering kill-switch")    print("   4. Check Prometheus metrics: http://localhost:9090")if __name__ == "__main__":    main()
+#!/usr/bin/env python3
+"""
+WebSocket Launch Event Simulator
+Sends a fake pump.fun launch event to test the trading system.
+"""
+
+import asyncio
+import websockets
+import json
+from datetime import datetime
+
+async def send_fake_launch_event():
+    """Send a fake LaunchEvent to the executor WebSocket"""
+    print("🚀 SENDING FAKE LAUNCH EVENT TO EXECUTOR")
+    print("=" * 50)
+    
+    # Create a fake launch event that should trigger a trade
+    fake_launch = {
+        "mint": "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263",  # BONK
+        "creator": "TestCreator123",
+        "holders_60": 1000,  # High holder count
+        "lp": 0.85  # Good liquidity ratio
+    }
+    
+    print(f"📊 Fake Launch Event:")
+    print(f"   Mint: {fake_launch['mint']}")
+    print(f"   Creator: {fake_launch['creator']}")
+    print(f"   Holders: {fake_launch['holders_60']}")
+    print(f"   LP Ratio: {fake_launch['lp']}")
+    
+    # Try to connect to the same WebSocket the executor uses
+    ws_url = "wss://devnet.helius-rpc.com/?api-key=c5379d76-ebc5-45df-9e69-3926173c0984"
+    
+    try:
+        print(f"\n🔌 Attempting to connect to: {ws_url}")
+        
+        # Note: This approach won't work because we can't inject into the executor's WebSocket stream
+        # But let's see what happens...
+        
+        async with websockets.connect(ws_url) as websocket:
+            print("✅ Connected to WebSocket")
+            
+            # Send the fake event
+            await websocket.send(json.dumps(fake_launch))
+            print("📤 Sent fake launch event")
+            
+            # Wait for any response
+            try:
+                response = await asyncio.wait_for(websocket.recv(), timeout=5.0)
+                print(f"📥 Received: {response}")
+            except asyncio.TimeoutError:
+                print("⏰ No response received (timeout)")
+                
+    except Exception as e:
+        print(f"❌ WebSocket connection failed: {e}")
+        print(f"\n💡 This approach won't work because:")
+        print(f"   1. The executor has its own WebSocket connection")
+        print(f"   2. We can't inject events into its stream")
+        print(f"   3. We need to modify the trader to read Redis signals")
+
+def main():
+    print("🎭 WEBSOCKET LAUNCH EVENT SIMULATOR")
+    print("=" * 60)
+    print(f"Timestamp: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    print()
+    
+    # Run the async function
+    asyncio.run(send_fake_launch_event())
+    
+    print(f"\n📋 ANALYSIS: Why the trading system isn't executing")
+    print("=" * 60)
+    print("✅ Current system architecture:")
+    print("   • Executor listens to Solana WebSocket for new token launches")
+    print("   • Scores each launch event with classifier algorithm")
+    print("   • Executes trades on high-scoring new tokens")
+    print("   • Does NOT read Redis trade signals")
+    print()
+    print("❌ The problem:")
+    print("   • Our Redis signals are being ignored")
+    print("   • Trader only processes LaunchEvent structs from WebSocket")
+    print("   • No Redis -> Trader signal pathway exists")
+    print()
+    print("💡 Solutions:")
+    print("   1. MODIFY trader.rs to also read Redis (proper fix)")
+    print("   2. Fund wallet with test USDC and wait for real launch events")
+    print("   3. Create a test WebSocket server that sends fake launches")
+    print()
+    print("🎯 Let's try solution #2 next - fund the wallet and wait for events!")
+
+if __name__ == "__main__":
+    main()
