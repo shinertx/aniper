@@ -37,6 +37,10 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
+    volumes:
+      - ${HOST_KEYPAIR_PATH:-$HOME/.config/solana/id.json}:/wallet/id.json:ro
+    env_file:
+      - .env
 
   brain:
     build:
