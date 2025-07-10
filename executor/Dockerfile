@@ -16,10 +16,18 @@ RUN rm -rf src
 COPY src ./src
 RUN cargo build --release
 
+# Strip the binary to reduce its size
+RUN strip target/release/executor
+
 # ---- Runtime stage ----
 FROM debian:bookworm-slim
-WORKDIR /app
+
+# Install necessary runtime dependencies, including SSL certificates
 RUN apt-get update && apt-get install -y libssl3 ca-certificates && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Copy the compiled binary from the builder stage
 COPY --from=builder /app/target/release/executor /usr/local/bin/executor
 ENV RUST_LOG=info
 EXPOSE 9184
