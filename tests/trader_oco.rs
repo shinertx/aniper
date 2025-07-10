@@ -1,7 +1,7 @@
 use executor::trader;
 use executor::ws_feed::LaunchEvent;
 use metrics_exporter_prometheus::PrometheusBuilder;
-use mockito::{mock, server_url};
+use mockito::Server;
 use tokio::sync::mpsc;
 use std::process::{Command, Stdio};
 use std::time::Duration;
@@ -53,17 +53,21 @@ async fn oco_two_orders_and_slippage_sample() {
         .install_recorder()
         .expect("prom metrics");
 
+    // Mock Jupiter API.
+    let mut server = Server::new_async().await;
+    let jupiter_api_url = server.url();
+
     // Environment wires.
     std::env::set_var("SOLANA_RPC_URL", "http://127.0.0.1:8899");
-    std::env::set_var("JUPITER_API", &server_url());
+    std::env::set_var("JUPITER_API", &jupiter_api_url);
 
     // Mock quote & swap to force fallback path (500 status).
-    let _m_quote = mock("GET", "/quote")
+    let _m_quote = server.mock("GET", "/quote")
         .with_status(500)
-        .create();
-    let _m_swap = mock("GET", "/swap")
+        .create_async().await;
+    let _m_swap = server.mock("GET", "/swap")
         .with_status(500)
-        .create();
+        .create_async().await;
 
     // Channels.
     let (evt_tx, evt_rx) = mpsc::channel(1);

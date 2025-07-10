@@ -44,7 +44,7 @@ async fn equity_floor_breach_emits_killswitch() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn equity_floor_rpc_balance() {
     let kp = Keypair::new();
-    let mut file = NamedTempFile::new().unwrap();
+    let file = NamedTempFile::new().unwrap();
     write_keypair_file(&kp, file.path()).unwrap();
     std::env::set_var("KEYPAIR_PATH", file.path());
 
@@ -94,4 +94,4 @@ async fn slippage_breach_emits_killswitch() {
     let body = handle.render();
     assert!(body.contains("risk_slippage_threshold"));
     assert!(body.contains("risk_last_slippage"));
-} 
+}
