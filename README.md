@@ -209,6 +209,27 @@ For advanced automation or HA, see `infra/` (optional).
 
 ---
 
+## Running Brain (Python Agent) Tests
+
+To verify the Python agent logic and guardrails:
+
+### A) Local (development)
+```bash
+cd brain                                # enter agent directory
+python3 -m venv .venv                   # create virtualenv
+source .venv/bin/activate               # activate environment
+pip install -r requirements.txt pytest  # install dependencies + test runner
+pytest -q                               # run all agent tests
+```
+
+### B) In Docker (test mode)
+```bash
+# Build production image
+docker build -t meme-brain -f brain/Dockerfile brain
+# Run tests without modifying Dockerfile by installing pytest at runtime
+docker run --rm meme-brain bash -lc "pip install pytest && pytest -q"
+```
+
 
 
 

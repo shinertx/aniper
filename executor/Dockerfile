@@ -6,14 +6,15 @@ RUN apt-get update && apt-get install -y libssl-dev pkg-config && rm -rf /var/li
 
 WORKDIR /app
 
-# 1. Cache dependencies
-COPY Cargo.toml Cargo.lock ./
+# 1. Cache dependencies (use workspace lock)
+COPY executor/Cargo.toml ./Cargo.toml
+COPY Cargo.lock ./Cargo.lock
 RUN mkdir -p src && echo "fn main() {}" > src/main.rs
 RUN cargo build --release
 RUN rm -rf src
 
-# 2. Copy source and build
-COPY src ./src
+# 2. Copy actual source and build
+COPY executor/src ./src
 RUN cargo build --release
 
 # Strip the binary to reduce its size

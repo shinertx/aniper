@@ -16,8 +16,8 @@ services:
 
   executor:
     build:
-      context: ./executor
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: executor/Dockerfile
     container_name: aniper-executor
     dns:
       - 8.8.8.8
