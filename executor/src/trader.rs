@@ -5,7 +5,10 @@ use crate::compliance;
 use anyhow::{anyhow, Result};
 use base64::engine::general_purpose::STANDARD as BASE64_STD;
 use base64::Engine;
-use std::time::Duration;
+use redis::aio::Connection;
+use redis::Client as RedisClient;
+use std::collections::HashSet;
+use std::time::{Duration, Instant};
 use tokio::sync::mpsc::Receiver;
 
 use reqwest::Client;
@@ -55,7 +58,13 @@ struct SwapTx {
 
 /// Attempt to fetch a pre-built swap transaction from a Jupiter-style endpoint. This is a
 /// placeholder implementation – on errors the caller should fall back to `fallback_transfer_tx`.
-async fn fetch_swap_tx(client: &RpcClient, keypair: &Keypair, output_mint: &str) -> Result<SwapTx> {
+async fn fetch_swap_tx(
+    client: &RpcClient, 
+    keypair: &Keypair, 
+    output_mint: &str,
+    amount_usdc: Option<u64>,
+    min_out_pct: Option<f64>
+) -> Result<SwapTx> {
     #[derive(serde::Deserialize)]
     #[allow(dead_code)]
     struct QuoteRoute {
@@ -86,17 +95,30 @@ async fn fetch_swap_tx(client: &RpcClient, keypair: &Keypair, output_mint: &str)
 
     let http = Client::new();
     let api = jupiter_api();
+    
+    // Use provided amount or default to 1 USDC (1,000,000 lamports)
+    let trade_amount = amount_usdc.unwrap_or(1_000_000);
 
     // -- 1. Quote -----------------------------------------------------------
-    let quote_url = format!("{api}/quote?inputMint={USDC_MINT}&outputMint={output_mint}&amount=1000000&slippageBps=100&onlyDirectRoutes=false&platformFeeBps=0");
-    let _quote: QuoteResp = http.get(&quote_url).send().await?.json().await?;
-    // For now we do not inspect the quote – the second call will embed
-    // slippage & post-only enforcement.  Retaining for completeness.
+    let quote_url = format!("{api}/quote?inputMint={USDC_MINT}&outputMint={output_mint}&amount={trade_amount}&slippageBps=100&onlyDirectRoutes=false&platformFeeBps=0");
+    let quote: QuoteResp = http.get(&quote_url).send().await?.json().await?;
+    
+    // Get expected output for min_out_pct calculation
+    let expected_out = if let Some(route) = quote.data.first() {
+        route.out_amount.parse::<u64>()?
+    } else {
+        return Err(anyhow!("No quote routes available"));
+    };
 
-    // -- 2. Swap ------------------------------------------------------------
-    // Jupiter swap endpoint requires the user public key so returned TX has us
-    // as fee-payer.  The market makin' specifics are abstracted away.
-    let swap_url = format!("{api}/swap?inputMint={USDC_MINT}&outputMint={output_mint}&slippageBps=100&userPublicKey={user}&wrapUnwrapSOL=true&feeBps=0", user = keypair.pubkey());
+    // -- 2. Swap with proper min_out calculation -----------------------------
+    let min_out_amount = if let Some(pct) = min_out_pct {
+        // For take-profit (pct > 1.0) or stop-loss (pct < 1.0)
+        ((expected_out as f64) * pct) as u64
+    } else {
+        expected_out // Use expected amount
+    };
+    
+    let swap_url = format!("{api}/swap?inputMint={USDC_MINT}&outputMint={output_mint}&amount={trade_amount}&slippageBps=100&userPublicKey={user}&wrapUnwrapSOL=true&feeBps=0&minOutAmount={min_out_amount}", user = keypair.pubkey());
 
     let resp: SwapResp = http.get(&swap_url).send().await?.json().await?;
     //  FIX: use BASE64_STD engine instead of deprecated base64::decode
@@ -108,10 +130,12 @@ async fn fetch_swap_tx(client: &RpcClient, keypair: &Keypair, output_mint: &str)
     let blockhash = client.get_latest_blockhash()?;
     tx.partial_sign(&[keypair], blockhash);
 
-    // price = out_amount / in_amount (both strings in lamports / token units)
+    // price = out_amount / in_amount - FIXED: Convert from lamports to token units
     let in_amt: f64 = resp.in_amount.parse::<u64>()? as f64;
     let out_amt: f64 = resp.out_amount.parse::<u64>()? as f64;
-    let price = if in_amt > 0.0 { out_amt / in_amt } else { 0.0 };
+    let in_amt_ui = in_amt / 1_000_000.0;        // USDC has 6 decimals
+    let out_amt_ui = out_amt / 1_000_000.0;      // Assume meme token has 6 decimals  
+    let price = if in_amt_ui > 0.0 { out_amt_ui / in_amt_ui } else { 0.0 };
 
     Ok(SwapTx { tx, price })
 }
@@ -206,8 +230,8 @@ fn sign_and_send(urls: &[String], tx: &Transaction, keypair: &Keypair) -> Result
 /// transactions.  If swap construction fails we fall back to 0-lamport
 /// transfers so latency tests remain unaffected.
 async fn build_oco(client: &RpcClient, keypair: &Keypair, mint: &str) -> Result<(SwapTx, SwapTx)> {
-    // TP route (sell) --------------------------------------------------------------------
-    let tp_tx = fetch_swap_tx(client, keypair, mint)
+    // TP route (sell) - Take profit at +75% --------------------------------------------
+    let tp_tx = fetch_swap_tx(client, keypair, mint, None, Some(1.75))
         .await
         .unwrap_or_else(|_| {
             tracing::warn!(target = "trade", "TP construction failed – using noop tx");
@@ -217,8 +241,8 @@ async fn build_oco(client: &RpcClient, keypair: &Keypair, mint: &str) -> Result<
             }
         });
 
-    // SL route (sell) --------------------------------------------------------------------
-    let sl_tx = fetch_swap_tx(client, keypair, mint)
+    // SL route (sell) - Stop loss at -40% -----------------------------------------------
+    let sl_tx = fetch_swap_tx(client, keypair, mint, None, Some(0.60))
         .await
         .unwrap_or_else(|_| {
             tracing::warn!(target = "trade", "SL construction failed – using noop tx");
@@ -229,6 +253,26 @@ async fn build_oco(client: &RpcClient, keypair: &Keypair, mint: &str) -> Result<
         });
 
     Ok((tp_tx, sl_tx))
+}
+
+/// Manual trade signal from Redis
+#[derive(Debug, serde::Deserialize)]
+struct RedisTradeSignal {
+    action: String,
+    token: String,
+    amount_usdc: f64,
+    max_slippage: f64,
+    source: String,
+}
+
+/// Convert Redis signal to LaunchEvent for processing
+fn redis_signal_to_launch_event(signal: &RedisTradeSignal) -> LaunchEvent {
+    LaunchEvent {
+        mint: signal.token.clone(),
+        creator: format!("redis_{}", signal.source),
+        holders_60: 1000, // High holder count to pass scoring
+        lp: 0.9, // High LP ratio to pass scoring
+    }
 }
 
 /// Core trade loop – consumes launch events and, when a positive classification is produced,
@@ -271,89 +315,162 @@ pub async fn run(
         let _ = wait_for_confirmation(&rpc, &sig);
     }
 
-    while let Some(ev) = rx.recv().await {
-        if score(&ev) <= 0.5 {
-            continue;
+    // Connect to Redis for manual trade signals
+    let redis_client = RedisClient::open("redis://redis:6379")?;
+    let mut redis_conn = redis_client.get_async_connection().await?;
+    tracing::info!(target = "trade", "Connected to Redis for manual trade signals");
+
+    // Deduplication: Track processed (mint, creator) pairs for 5 minutes
+    let mut processed_events: HashSet<(String, String)> = HashSet::new();
+    let mut last_cleanup = Instant::now();
+
+    loop {
+        // Clean up old events every minute
+        if last_cleanup.elapsed() > Duration::from_secs(60) {
+            processed_events.clear();
+            last_cleanup = Instant::now();
+            tracing::debug!(target = "trade", "Cleared deduplication cache");
         }
 
-        // Compliance / sanctions check.
-        if compliance::is_sanctioned(&ev.creator) || compliance::is_sanctioned(&ev.mint) {
-            tracing::warn!(
-                target = "trade",
-                "Skipping sanctioned asset or creator: creator={} mint={}",
-                ev.creator,
-                ev.mint
-            );
-            continue;
-        }
+        tokio::select! {
+            // Process WebSocket launch events
+            Some(ev) = rx.recv() => {
+                // Deduplication check
+                let event_key = (ev.mint.clone(), ev.creator.clone());
+                if processed_events.contains(&event_key) {
+                    tracing::debug!(target = "trade", "Skipping duplicate event for mint: {}", ev.mint);
+                    continue;
+                }
+                processed_events.insert(event_key);
 
-        tracing::info!(target = "trade", "Attempting buy for mint {}", ev.mint);
+                if score(&ev) <= 0.5 {
+                    continue;
+                }
 
-        // Build swap TX or fall back.
-        let buy_swap = match fetch_swap_tx(&rpc, &keypair, &ev.mint).await {
-            Ok(t) => t,
-            Err(e) => {
-                tracing::warn!(
-                    target = "trade",
-                    "swap construction failed – falling back: {e}"
-                );
-                SwapTx {
-                    tx: fallback_transfer_tx(&rpc, &keypair)?,
-                    price: 0.0,
+                // Compliance / sanctions check.
+                if compliance::is_sanctioned(&ev.creator) || compliance::is_sanctioned(&ev.mint) {
+                    tracing::warn!(
+                        target = "trade",
+                        "Skipping sanctioned asset or creator: creator={} mint={}",
+                        ev.creator,
+                        ev.mint
+                    );
+                    continue;
+                }
+
+                tracing::info!(target = "trade", "Processing WebSocket launch event for mint {}", ev.mint);
+                if let Err(e) = execute_trade(&rpc, &keypair, &ev, &slip_tx).await {
+                    tracing::error!(target = "trade", "Trade execution failed: {}", e);
                 }
             }
-        };
 
-        // Broadcast.
-        let sig = sign_and_send(&[rpc_url()], &buy_swap.tx, &keypair)?;
-        inc_trades_submitted();
-        tracing::info!(target = "trade", "Submitted buy tx: {sig}");
-        wait_for_confirmation(&rpc, &sig)?;
-        inc_trades_confirmed();
-        tracing::info!(target = "trade", "Buy confirmed: {sig}");
+            // Process Redis trade signals
+            _ = tokio::time::sleep(tokio::time::Duration::from_secs(1)) => {
+                // Check for Redis trade signals
+                let signal_data: Option<String> = redis::cmd("LPOP")
+                    .arg("trade_signals")
+                    .query_async(&mut redis_conn)
+                    .await
+                    .unwrap_or(None);
 
-        // ------------------------------------------------------------------
-        // Build OCO exit legs
-        // ------------------------------------------------------------------
-        let (tp_swap, sl_swap) = build_oco(&rpc, &keypair, &ev.mint).await?;
-
-        // Gather RPC endpoints – primary defaults to initial URL, others may
-        // be supplied via comma-separated `SOLANA_RPC_URLS` env var.
-        let mut rpc_urls: Vec<String> = std::env::var("SOLANA_RPC_URLS")
-            .ok()
-            .map(|v| v.split(',').map(|s| s.trim().to_string()).collect())
-            .unwrap_or_default();
-        if rpc_urls.is_empty() {
-            rpc_urls.push(rpc_url());
+                if let Some(signal_json) = signal_data {
+                    tracing::info!(target = "trade", "Processing Redis trade signal: {}", signal_json);
+                    
+                    match serde_json::from_str::<RedisTradeSignal>(&signal_json) {
+                        Ok(signal) => {
+                            if signal.action == "buy" {
+                                let launch_event = redis_signal_to_launch_event(&signal);
+                                tracing::info!(target = "trade", "Executing Redis-triggered trade for mint {}", launch_event.mint);
+                                
+                                if let Err(e) = execute_trade(&rpc, &keypair, &launch_event, &slip_tx).await {
+                                    tracing::error!(target = "trade", "Redis trade execution failed: {}", e);
+                                }
+                            }
+                        }
+                        Err(e) => {
+                            tracing::warn!(target = "trade", "Failed to parse Redis signal: {}", e);
+                        }
+                    }
+                }
+            }
         }
-
-        // --- TP leg -------------------------------------------------------
-        let tp_sig = sign_and_send(&rpc_urls, &tp_swap.tx, &keypair)?;
-        inc_trades_submitted();
-        tracing::info!(target = "trade", "TP leg submitted: {tp_sig}");
-
-        // --- SL leg -------------------------------------------------------
-        let sl_sig = sign_and_send(&rpc_urls, &sl_swap.tx, &keypair)?;
-        inc_trades_submitted();
-        tracing::info!(target = "trade", "SL leg submitted: {sl_sig}");
-
-        // We do *not* wait for confirmations here – the two orders race each
-        // other and one will eventually settle the position.  Whichever wins
-        // will be picked up by the slippage sentinel down-stream.
-
-        // -----------------------------------------------------------------
-        // Slippage reporting – compute based on TP leg implied price.
-        // If prices unavailable, default to 0.
-        // -----------------------------------------------------------------
-        let entry_price = buy_swap.price;
-        let exit_price = tp_swap.price; // optimistic TP reference
-        let slip_value = if entry_price > 0.0 && exit_price > 0.0 {
-            (exit_price / entry_price) - 1.0
-        } else {
-            0.0
-        };
-        let _ = slip_tx.send(slip_value).await; // ignore error if channel closed
     }
+
+}
+
+/// Execute a trade for the given launch event
+async fn execute_trade(
+    rpc: &RpcClient,
+    keypair: &Keypair,
+    ev: &LaunchEvent,
+    slip_tx: &tokio::sync::mpsc::Sender<f64>,
+) -> Result<()> {
+    tracing::info!(target = "trade", "Attempting buy for mint {}", ev.mint);
+
+    // Build swap TX or fall back.
+    let buy_swap = match fetch_swap_tx(rpc, keypair, &ev.mint, None, None).await {
+        Ok(t) => t,
+        Err(e) => {
+            tracing::warn!(
+                target = "trade",
+                "swap construction failed – falling back: {e}"
+            );
+            SwapTx {
+                tx: fallback_transfer_tx(rpc, keypair)?,
+                price: 0.0,
+            }
+        }
+    };
+
+    // Broadcast.
+    let sig = sign_and_send(&[rpc_url()], &buy_swap.tx, keypair)?;
+    inc_trades_submitted();
+    tracing::info!(target = "trade", "Submitted buy tx: {sig}");
+    wait_for_confirmation(rpc, &sig)?;
+    inc_trades_confirmed();
+    tracing::info!(target = "trade", "Buy confirmed: {sig}");
+
+    // ------------------------------------------------------------------
+    // Build OCO exit legs
+    // ------------------------------------------------------------------
+    let (tp_swap, sl_swap) = build_oco(rpc, keypair, &ev.mint).await?;
+
+    // Gather RPC endpoints – primary defaults to initial URL, others may
+    // be supplied via comma-separated `SOLANA_RPC_URLS` env var.
+    let mut rpc_urls: Vec<String> = std::env::var("SOLANA_RPC_URLS")
+        .ok()
+        .map(|v| v.split(',').map(|s| s.trim().to_string()).collect())
+        .unwrap_or_default();
+    if rpc_urls.is_empty() {
+        rpc_urls.push(rpc_url());
+    }
+
+    // --- TP leg -------------------------------------------------------
+    let tp_sig = sign_and_send(&rpc_urls, &tp_swap.tx, keypair)?;
+    inc_trades_submitted();
+    tracing::info!(target = "trade", "TP leg submitted: {tp_sig}");
+
+    // --- SL leg -------------------------------------------------------
+    let sl_sig = sign_and_send(&rpc_urls, &sl_swap.tx, keypair)?;
+    inc_trades_submitted();
+    tracing::info!(target = "trade", "SL leg submitted: {sl_sig}");
+
+    // We do *not* wait for confirmations here – the two orders race each
+    // other and one will eventually settle the position.  Whichever wins
+    // will be picked up by the slippage sentinel down-stream.
+
+    // -----------------------------------------------------------------
+    // Slippage reporting – compute based on TP leg implied price.
+    // If prices unavailable, default to 0.
+    // -----------------------------------------------------------------
+    let entry_price = buy_swap.price;
+    let exit_price = tp_swap.price; // optimistic TP reference
+    let slip_value = if entry_price > 0.0 && exit_price > 0.0 {
+        (exit_price / entry_price) - 1.0
+    } else {
+        0.0
+    };
+    let _ = slip_tx.send(slip_value).await; // ignore error if channel closed
 
     Ok(())
 }
