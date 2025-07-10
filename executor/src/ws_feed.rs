@@ -31,14 +31,30 @@ pub fn normalise_message(raw: &str) -> Option<LaunchEvent> {
     serde_json::from_str::<LaunchEvent>(raw).ok()
 }
 
+/// Returns the websocket URL to use, derived from the `SOLANA_RPC_URL`
+/// environment variable.
+fn ws_url() -> String {
+    let rpc_url = std::env::var("SOLANA_RPC_URL")
+        .or_else(|_| std::env::var("SOLANA_URL"))
+        .or_else(|_| std::env::var("RPC_URL"))
+        .unwrap_or_else(|_| "https://api.devnet.solana.com".to_string());
+
+    // Convert http(s) to ws(s)
+    rpc_url
+        .replace("https://", "wss://")
+        .replace("http://", "ws://")
+}
+
 /* -------------------------------------------------------------------------
  * FIX: return a single-parameter Result
  * ---------------------------------------------------------------------- */
 pub async fn run(tx: Sender<LaunchEvent>) -> Result<()> {
     use std::time::Duration;
-    let url = "wss://devnet-replay.example/ws";
+    let url = ws_url();
+    tracing::info!(target = "ws_feed", "Connecting to WebSocket: {}", url);
+
     loop {
-        let (ws, _) = match connect_async(url).await {
+        let (ws, _) = match connect_async(&url).await {
             Ok(v) => v,
             Err(e) => {
                 warn!(target = "ws_feed", "connect error: {e}");
