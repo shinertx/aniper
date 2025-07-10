@@ -114,7 +114,9 @@ async fn main() -> Result<()> {
         }
     });
 
-    metrics::serve_prometheus();
+    tokio::spawn(async {
+        metrics::serve_prometheus();
+    });
     std::future::pending::<()>().await;
     Ok(())
 }
