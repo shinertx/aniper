@@ -91,17 +91,6 @@ def test_meme_coin_live_data():
     else:
         print("❌ No successful meme coin data retrieved")
         return False
-            
-            return True
-            
-        else:
-            print(f"❌ Jupiter API Error: {response.status_code}")
-            print(f"Response: {response.text}")
-            return False
-            
-    except Exception as e:
-        print(f"❌ Error fetching live data: {e}")
-        return False
 
 def test_meme_heuristic_agent(meme_prices):
     """Test heuristic agent logic with live meme coin price data"""
@@ -171,84 +160,145 @@ def test_meme_heuristic_agent(meme_prices):
     
     return True
 
-def test_narrative_simulation():
-    """Simulate narrative agent with mock social data"""
-    print(f"\n📱 Testing Narrative Agent (Simulated):")
-    print("-" * 40)
+def test_meme_narrative_simulation():
+    """Simulate narrative agent with mock meme coin social data"""
+    print(f"\n📱 Testing Meme Narrative Agent (Simulated):")
+    print("-" * 50)
     
-    # Mock social media posts (representing what we'd get from Twitter)
-    mock_posts = [
-        "SOL is absolutely pumping today! New ATH incoming 🚀🌙",
-        "Market looking bearish, time to take profits on SOL positions",
-        "Solana network congestion issues again... not good for price",
-        "Major DeFi protocol launching on Solana next week, bullish!",
-        "SOL chart looking good, break above $200 would be massive"
+    # Mock social media posts specifically about meme coins
+    mock_meme_posts = [
+        "BONK is absolutely pumping today! This dog coin is going to the moon 🚀🐕",
+        "WIF (dogwifhat) looking sus... might be time to take profits and run",
+        "PEPE season is back! Just aped into a fat bag, let's go frogs 🐸💎", 
+        "Meme coins are getting wild again, pump.fun launching 50 new coins per hour",
+        "These Solana meme coins are pure degeneracy but I can't stop buying them 🎪",
+        "Got rugged by another dog coin... why do I keep falling for this 💀",
+        "WIF chart looking bullish AF! Break above resistance incoming 📈",
+        "BONK community is unhinged in the best way, diamond handing this one 💎🙌"
     ]
     
     sentiments = []
-    for i, post in enumerate(mock_posts):
-        sentiment = calculate_sentiment(post)
+    meme_signals = []
+    
+    for i, post in enumerate(mock_meme_posts):
+        sentiment = calculate_meme_sentiment(post)
         sentiments.append(sentiment)
-        print(f"Post {i+1}: {sentiment:.2f} | {post[:50]}...")
+        
+        # Extract meme-specific signals
+        meme_signal = extract_meme_signals(post)
+        meme_signals.append(meme_signal)
+        
+        print(f"Post {i+1}: {sentiment:.2f} | {meme_signal} | {post[:60]}...")
     
     avg_sentiment = sum(sentiments) / len(sentiments)
-    print(f"\n📊 Sentiment Analysis:")
+    bullish_count = sum(1 for s in meme_signals if 'BULL' in s)
+    bearish_count = sum(1 for s in meme_signals if 'BEAR' in s)
+    
+    print(f"\n📊 Meme Sentiment Analysis:")
     print(f"Average Sentiment: {avg_sentiment:.2f}")
     print(f"Sentiment Range: {min(sentiments):.2f} to {max(sentiments):.2f}")
+    print(f"Bullish Signals: {bullish_count}")
+    print(f"Bearish Signals: {bearish_count}")
     
     # Generate narrative signal
-    if avg_sentiment > 0.3:
-        narrative_signal = "BULLISH"
-    elif avg_sentiment < -0.3:
-        narrative_signal = "BEARISH"
+    if avg_sentiment > 0.3 or bullish_count > bearish_count + 2:
+        narrative_signal = "MEME SEASON 🚀"
+    elif avg_sentiment < -0.3 or bearish_count > bullish_count + 2:
+        narrative_signal = "MEME WINTER ❄️"
     else:
-        narrative_signal = "NEUTRAL"
+        narrative_signal = "MEME CHOP 🌊"
     
-    print(f"🎯 Narrative Signal: {narrative_signal}")
+    print(f"🎯 Meme Narrative Signal: {narrative_signal}")
     return narrative_signal, avg_sentiment
 
-def calculate_sentiment(text):
-    """Simple sentiment calculation"""
-    bullish_words = ['pump', 'moon', 'bullish', 'ath', 'massive', 'good', 'launch']
-    bearish_words = ['bearish', 'dump', 'crash', 'issues', 'congestion', 'bad']
+def extract_meme_signals(text):
+    """Extract meme-specific trading signals from text"""
+    text_lower = text.lower()
+    
+    if any(word in text_lower for word in ['pump', 'moon', 'bullish', 'break above']):
+        return "BULL"
+    elif any(word in text_lower for word in ['dump', 'sus', 'rug', 'take profits']):
+        return "BEAR"
+    elif any(word in text_lower for word in ['diamond hand', 'hodl', 'fat bag']):
+        return "HOLD"
+    else:
+        return "NEUTRAL"
+
+def calculate_meme_sentiment(text):
+    """Calculate sentiment specific to meme coin culture"""
+    bullish_meme_words = [
+        'pump', 'moon', '🚀', '💎', 'diamond', 'bullish', 'break above',
+        'aped', 'fat bag', 'season', 'going', 'unhinged', 'best way'
+    ]
+    
+    bearish_meme_words = [
+        'sus', 'rug', 'rugged', 'take profits', 'run', 'degeneracy', 
+        'wild', 'falling', '💀', 'can\'t stop'
+    ]
     
     text_lower = text.lower()
-    bullish_count = sum(1 for word in bullish_words if word in text_lower)
-    bearish_count = sum(1 for word in bearish_words if word in text_lower)
     
-    return (bullish_count - bearish_count) / max(len(text.split()), 1)
+    bullish_count = sum(1 for word in bullish_meme_words if word in text_lower)
+    bearish_count = sum(1 for word in bearish_meme_words if word in text_lower)
+    
+    # Factor in meme emojis
+    rocket_count = text.count('🚀') + text.count('🌙')
+    diamond_count = text.count('💎') + text.count('🙌')
+    negative_count = text.count('💀') + text.count('❄️')
+    
+    total_signals = bullish_count + bearish_count + rocket_count + diamond_count + negative_count
+    
+    if total_signals == 0:
+        return 0.0
+    
+    sentiment = (bullish_count + rocket_count + diamond_count - bearish_count - negative_count) / max(len(text.split()), 1)
+    return sentiment
 
 def main():
-    """Run comprehensive live data testing"""
-    print("🔥 LIVE DATA AGENT TESTING")
-    print("=" * 60)
+    """Run comprehensive meme coin live data testing"""
+    print("� MEME COIN LIVE DATA AGENT TESTING")
+    print("=" * 70)
     print(f"Timestamp: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    print("Focus: Live meme coin prices and social sentiment")
     print()
     
-    # Test 1: Live market data
-    jupiter_success = test_jupiter_live_data()
+    # Test 1: Live meme coin market data
+    meme_success = test_meme_coin_live_data()
     
-    # Test 2: Narrative analysis (simulated)
-    narrative_signal, avg_sentiment = test_narrative_simulation()
+    # Test 2: Meme narrative analysis (simulated)
+    narrative_signal, avg_sentiment = test_meme_narrative_simulation()
     
     # Combined analysis
-    if jupiter_success:
-        print(f"\n🧠 COMBINED AGENT ANALYSIS:")
-        print("=" * 40)
-        print("✅ Market data: LIVE")
+    if meme_success:
+        print(f"\n🧠 COMBINED MEME AGENT ANALYSIS:")
+        print("=" * 50)
+        print("✅ Meme coin data: LIVE (Jupiter API)")
         print("✅ Sentiment data: SIMULATED")
         print(f"📊 Narrative bias: {narrative_signal}")
-        print(f"📈 Market analysis: Based on live SOL prices")
+        print(f"📈 Market analysis: Based on live meme coin prices")
+        print(f"🎯 Sentiment score: {avg_sentiment:.2f}")
         
         # This is where the real system would combine signals
-        print(f"\n💡 Next Steps for Full Live Testing:")
-        print("1. ✅ Jupiter API integration working")
-        print("2. 🔄 Add Twitter API for real sentiment data")
-        print("3. 🔄 Add Solana WebSocket for real-time events")
-        print("4. 🔄 Run agents continuously with live feeds")
+        print(f"\n💡 Next Steps for Full Meme Coin Live Trading:")
+        print("1. ✅ Jupiter API integration working for meme coins")
+        print("2. 🔄 Add pump.fun WebSocket for new token detection")
+        print("3. 🔄 Add Twitter API for real meme coin sentiment")
+        print("4. 🔄 Add Telegram group monitoring for meme communities")
+        print("5. 🔄 Implement social momentum scoring")
+        print("6. 🔄 Add holder analytics from Solana RPC")
+        print("7. 🔄 Run agents continuously with live meme feeds")
+        
+        print(f"\n🎪 MEME COIN SYSTEM STATUS:")
+        print("✅ Basic meme coin price fetching: WORKING")
+        print("✅ Meme-specific risk analysis: IMPLEMENTED")
+        print("✅ Social sentiment simulation: WORKING")
+        print("🔄 Real-time social feeds: PENDING")
+        print("🔄 pump.fun integration: PENDING")
+        print("🔄 Automated trading: PENDING")
         
     else:
-        print("\n❌ Live market data failed - check network/API access")
+        print("\n❌ Live meme coin data failed - check network/API access")
+        print("Falling back to simulated narrative analysis only...")
 
 if __name__ == "__main__":
     main()
