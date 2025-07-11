@@ -1,5 +1,5 @@
 use executor::classifier::{score, load_wasm};
-use executor::ws_feed::LaunchEvent;
+use executor::ws_feed::{LaunchEvent, Platform};
 
 #[test]
 fn static_score_deterministic() {
@@ -8,6 +8,7 @@ fn static_score_deterministic() {
         creator: "XYZ".into(),
         holders_60: 60,
         lp: 0.75,
+        platform: Platform::PumpFun,
     };
     assert!((score(&evt) - 0.9).abs() < f32::EPSILON);
 
@@ -16,6 +17,7 @@ fn static_score_deterministic() {
         creator: "UVW".into(),
         holders_60: 49,
         lp: 0.3,
+        platform: Platform::LetsBonk,
     };
     assert!((score(&evt_low) - 0.1).abs() < f32::EPSILON);
 }

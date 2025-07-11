@@ -110,8 +110,8 @@ pub fn normalise_message(raw: &str, platform: Platform) -> Option<LaunchEvent> {
     // on-chain program's logging format.
     // Example log format: "Program log: creator: CREATOR_PUBKEY"
     // Example log format: "Program log: mint: MINT_PUBKEY"
-    let mint = logs.iter().find_map(|log| extract_from_log(log, "creator: "));
-    let creator = logs.iter().find_map(|log| extract_from_log(log, "mint: "));
+    let mint = logs.iter().find_map(|log| extract_from_log(log, "mint: "));
+    let creator = logs.iter().find_map(|log| extract_from_log(log, "creator: "));
 
     if let (Some(mint), Some(creator)) = (mint, creator) {
         if mint.is_empty() || creator.is_empty() {

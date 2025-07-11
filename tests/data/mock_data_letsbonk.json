@@ -1,0 +1,16 @@
+[
+  {
+    "mint": "bonkMint111111111111111111111111111111111",
+    "creator": "bonkCreator111111111111111111111111111111",
+    "holders_60": 80,
+    "lp": 25000.0,
+    "platform": "LetsBonk"
+  },
+  {
+    "mint": "bonkMint222222222222222222222222222222222",
+    "creator": "bonkCreator222222222222222222222222222222",
+    "holders_60": 55,
+    "lp": 12000.0,
+    "platform": "LetsBonk"
+  }
+]

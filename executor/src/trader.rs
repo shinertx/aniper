@@ -439,7 +439,7 @@ pub async fn run(
                 }
 
                 // --- New Risk Checks ---
-                let risk_config = RISK_CONFIG.read().unwrap();
+                let risk_config = RISK_CONFIG.read().unwrap().clone();
                 if ev.lp < risk_config.liquidity_threshold_usd {
                     tracing::warn!(
                         target = "trade",
@@ -510,7 +510,7 @@ async fn execute_trade(
     tracing::info!(target = "trade", "Attempting buy for mint {}", ev.mint);
 
     // --- Position Sizing ---
-    let risk_config = RISK_CONFIG.read().unwrap();
+    let risk_config = RISK_CONFIG.read().unwrap().clone();
     let balance_usdc = crate::risk::get_balance_usdc().await.unwrap_or(1000.0); // Default to 1k if fetch fails
     let position_size_usdc = balance_usdc * (risk_config.position_size_percent / 100.0);
     let position_size_lamports = (position_size_usdc * 1_000_000.0) as u64;

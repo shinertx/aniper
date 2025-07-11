@@ -1,0 +1,16 @@
+[
+  {
+    "mint": "pumpMint111111111111111111111111111111111",
+    "creator": "pumpCreator111111111111111111111111111111",
+    "holders_60": 70,
+    "lp": 15000.0,
+    "platform": "PumpFun"
+  },
+  {
+    "mint": "pumpMint222222222222222222222222222222222",
+    "creator": "pumpCreator222222222222222222222222222222",
+    "holders_60": 40,
+    "lp": 8000.0,
+    "platform": "PumpFun"
+  }
+]
