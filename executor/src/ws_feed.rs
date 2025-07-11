@@ -60,6 +60,8 @@ pub struct LaunchEvent {
     pub holders_60: u32,
     pub lp: f64,
     pub platform: Platform,
+    pub amount_usdc: Option<f64>,
+    pub max_slippage: Option<f64>,
 }
 
 const MAX_MSG_LEN: usize = 65536; // Increased for verbose log messages
@@ -128,6 +130,8 @@ pub fn normalise_message(raw: &str, platform: Platform) -> Option<LaunchEvent> {
             holders_60: 0,
             lp: 0.0,
             platform,
+            amount_usdc: None,
+            max_slippage: None,
         })
     } else {
         None
@@ -261,4 +265,33 @@ pub async fn run(tx: Sender<LaunchEvent>) -> Result<()> {
     futures_util::future::join_all(handles).await;
 
     Ok(())
+}
+
+/// Process log messages for the PumpFun platform.
+fn process_log_messages(logs: &[String], tx: &Sender<LaunchEvent>) {
+    use solana_program::pubkey::Pubkey;
+    use std::str::FromStr;
+
+    // Extract mint, creator, and LP values from logs
+    let mint_opt = logs.iter().find_map(|log| extract_from_log(log, "mint: "));
+    let creator_opt = logs.iter().find_map(|log| extract_from_log(log, "creator: "));
+    let lp_opt = logs.iter().find_map(|log| extract_from_log(log, "lp: "));
+
+    // Ensure all values are present
+    if let (Some(mint), Some(creator), Some(lp_str)) = (mint_opt, creator_opt, lp_opt) {
+        if let Ok(lp) = lp_str.parse::<f64>() {
+            let event = LaunchEvent {
+                mint,
+                creator,
+                holders_60: 0, // Placeholder, will be updated
+                lp,
+                platform: Platform::PumpFun,
+                amount_usdc: None,
+                max_slippage: None,
+            };
+            if let Err(e) = tx.send(event) {
+                error!("Failed to send launch event: {}", e);
+            }
+        }
+    }
 }

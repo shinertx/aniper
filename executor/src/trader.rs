@@ -332,9 +332,11 @@ fn redis_signal_to_launch_event(signal: &RedisTradeSignal) -> LaunchEvent {
     LaunchEvent {
         mint: signal.token.clone(),
         creator: format!("redis_{}", signal.source),
-        holders_60: 1000, // High holder count to pass scoring
-        lp: 999999.0,     // High LP to pass liquidity check
+        holders_60: 0, // Not available in Redis signal
+        lp: 0.0,       // Not available in Redis signal
         platform,
+        amount_usdc: Some(signal.amount_usdc),
+        max_slippage: Some(signal.max_slippage),
     }
 }
 
