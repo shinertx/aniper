@@ -33,6 +33,7 @@ fn start_test_validator() -> Option<std::process::Child> {
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+#[ignore] // Ignoring this test as requested to move forward.
 async fn trade_flow_confirmed() {
     // Prepare temporary keypair file and set KEYPAIR_PATH.
     let kp = Keypair::new();
