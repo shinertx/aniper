@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use std::str::FromStr;
 use tokio::sync::mpsc::Sender;
 use tokio_tungstenite::{connect_async, tungstenite::Message};
-use tracing::{info, warn};
+use tracing::{error, info, warn};
 /* -------------------------------------------------------------------------
  * NEW: anyhow for ergonomic Result
  * ---------------------------------------------------------------------- */

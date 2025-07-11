@@ -2,8 +2,8 @@
 set -euo pipefail
 
 # --- Configuration ---
-# Default mock data file if no platform is specified
-DEFAULT_MOCK_DATA="tests/data/mock_data.json"
+MOCK_DATA_DIR="tests/data"
+DEFAULT_MOCK_DATA="$MOCK_DATA_DIR/mock_data.json"
 
 # --- Helper Functions ---
 info() {
@@ -15,15 +15,33 @@ error() {
     exit 1
 }
 
-# --- Main Logic ---
-
-# Check for --dry-run flag
+# --- Argument Parsing ---
 DRY_RUN=false
-if [[ "${1:-}" == "--dry-run" ]]; then
-    DRY_RUN=true
-    shift # remove --dry-run from arguments
+PLATFORMS_ARG=""
+# Handle named arguments first
+while [[ $# -gt 0 ]]; do
+    key="$1"
+    case $key in
+        --dry-run)
+        DRY_RUN=true
+        shift # past argument
+        ;;
+        --platforms)
+        PLATFORMS_ARG="$2"
+        shift # past argument
+        shift # past value
+        ;;
+        *)    # unknown option, assume it's a platform name
+        break
+        ;;
+    esac
+done
+
+if [ "$DRY_RUN" = true ]; then
     info "Dry run mode enabled."
 fi
+
+# --- Main Logic ---
 
 # Function to run replay for a given platform and data file
 run_replay() {
@@ -48,10 +66,29 @@ run_replay() {
     fi
 }
 
-# If arguments are provided, treat them as platforms to replay
+# Handle --platforms all
+if [[ "$PLATFORMS_ARG" == "all" ]]; then
+    info "Processing --platforms all. Finding all mock data files..."
+    found_files=false
+    for data_file in "$MOCK_DATA_DIR"/mock_data_*.json; do
+        if [ -f "$data_file" ]; then
+            found_files=true
+            # Extract platform name from filename (mock_data_PLATFORM.json)
+            platform=$(basename "$data_file" .json | sed 's/mock_data_//')
+            run_replay "$platform" "$data_file"
+        fi
+    done
+    if [ "$found_files" = false ]; then
+        error "No mock data files found matching '$MOCK_DATA_DIR/mock_data_*.json'"
+    fi
+    exit 0
+fi
+
+# If specific platforms are provided as arguments (e.g., ./script.sh pump.fun)
 if [ "$#" -gt 0 ]; then
+    info "Processing specific platforms from arguments: $@"
     for platform in "$@"; do
-        platform_data_file="tests/data/mock_data_${platform}.json"
+        platform_data_file="$MOCK_DATA_DIR/mock_data_${platform}.json"
         run_replay "$platform" "$platform_data_file"
     done
     exit 0
@@ -60,13 +97,13 @@ fi
 # If no arguments, check for PLATFORMS in .env or use default
 if [ -f ".env" ]; then
     # Simple parse of PLATFORMS from .env, removing quotes and splitting by comma
-    PLATFORMS=$(grep -E '^PLATFORMS=' .env | cut -d '=' -f2 | tr -d '"' | tr ',' ' ')
+    PLATFORMS_ENV=$(grep -E '^PLATFORMS=' .env | cut -d '=' -f2 | tr -d '"' | tr ',' ' ')
 fi
 
-if [ -n "${PLATFORMS:-}" ]; then
-    info "Found platforms in .env: $PLATFORMS"
-    for platform in $PLATFORMS; do
-        platform_data_file="tests/data/mock_data_${platform}.json"
+if [ -n "${PLATFORMS_ENV:-}" ]; then
+    info "Found platforms in .env: $PLATFORMS_ENV"
+    for platform in $PLATFORMS_ENV; do
+        platform_data_file="$MOCK_DATA_DIR/mock_data_${platform}.json"
         if [ -f "$platform_data_file" ]; then
             run_replay "$platform" "$platform_data_file"
         else
