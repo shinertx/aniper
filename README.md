@@ -1,17 +1,17 @@
-# MEME-SNIPER POD — $1,000 → $50,000 IN 7 DAYS
+# Aniper - High-Frequency Memecoin Sniper
 
 ---
 
 ## 1 | Executive Summary
 
-Meme-Sniper Pod is a latency-optimized, agent-powered system for sniping first-block Solana/Base memecoin launches.
+Aniper is a latency-optimized, agent-powered system for sniping first-block memecoin launches on Solana. It is designed for high performance, modularity, and robust risk management.
 
-- **Rust executor:** Ultra-fast, sub-slot, multi-RPC trading engine.
-- **WASM classifier:** Nightly-retrained model (hot-swappable, <1ms scoring).
-- **Python agent layer:** LLM-driven (feature miner, narrative, red-team, coach).
-- **Deployment:** Runs on any Linux VM, server, or Docker—**no Kubernetes or Terraform required**.
-- **Zero LLM calls in the latency path.**  
-  All models, guardrails, and kill-switches are enforced in-process.
+- **Multi-Platform:** Natively supports both **pump.fun** and **LetsBonk** platforms out-of-the-box.
+- **Rust Executor:** Ultra-fast, multi-threaded trading engine built with Tokio for concurrent, non-blocking I/O.
+- **WASM Classifier:** Nightly-retrained model for hot-swappable, sub-millisecond scoring of potential trades.
+- **Python Agent Layer:** LLM-driven agents for feature mining, narrative analysis, and continuous performance coaching.
+- **Dockerized:** Turnkey deployment with Docker Compose.
+- **Zero LLM calls in the latency path.** All models, guardrails, and kill-switches are enforced in-process by the Rust executor.
 
 ---
 
@@ -23,212 +23,96 @@ Meme-Sniper Pod is a latency-optimized, agent-powered system for sniping first-b
 │   └── Dockerfile    # Executor Docker image
 ├── brain/            # Python LLM agent suite (logic/cron)
 │   └── Dockerfile    # Brain/agent Docker image
-├── models/           # WASM model artifacts (auto-created)
-├── scripts/          # replay_harness, canary_test, rotate_keys.sh
-├── docs/             # PROMPTS.md, AGENTS_GUIDE.md, run-books
-├── AGENTS.md         # Workflow, testing, and audit constitution
-├── .github/          # Copilot/CI configs
-├── infra/ (optional) # terraform/, k8s/ for advanced infra (optional)
-````
-> **Note:**  
-> `models/` is created automatically by the training agent if missing.  
-> `infra/` is only for users who want advanced IaC or Kubernetes.
+├── scripts/          # replay_harness.sh, and other utility scripts
+├── AGENTS.md         # Contributor governance and workflow constitution
+├── docker-compose.yml # Main Docker Compose file
+├── prometheus.yml    # Prometheus configuration
+├── .env              # Local environment configuration (gitignored)
+```
 
 ---
 
-## 3 | Quick Start — Manual/Single-VM/Docker
+## 3 | Quick Start with Docker Compose
 
-### **Option A: Native (VM/Bare Metal)**
+This project is optimized for a Docker-first workflow.
+
+### **Prerequisites**
+- Docker & Docker Compose
+- `git`
+- A Solana keypair file (e.g., `~/.config/solana/id.json`)
+
+### **Steps**
+
+**1. Clone the repository:**
 ```bash
-# 1. Install dependencies (Ubuntu 22.04 recommended)
-sudo apt-get update && sudo apt-get install -y build-essential python3.11 python3.11-venv redis-server
+git clone https://github.com/<your-org>/aniper.git
+cd aniper
+```
 
-# 2. Clone and build
-git clone https://github.com/<your-org>/meme-sniper.git && cd meme-sniper
-cd executor && cargo build --release
-
-# 3. Prepare environment variables
+**2. Create your environment file:**
+Copy the example environment file and fill in your details.
+```bash
 cp .env.example .env
-nano .env  # fill in all required API keys, RPC URLs, Redis URL, key paths
+nano .env
+```
+> **Important:** You must set `HOST_KEYPAIR_PATH` to the absolute path of your Solana wallet file on your host machine. This file is securely mounted into the executor container.
 
-# 4. Start Redis (localhost bind, password in redis.conf)
-sudo systemctl start redis-server
-sudo systemctl enable redis-server
-
-# 5. Start executor
-source ../.env
-./target/release/executor
-
-# 6. Start Python agent manager
-cd ../brain
-python3.11 -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
-source ../.env
-python -m brain.manager
-````
-
----
-
-### **Option B: Docker / Docker Compose (Recommended for Most Teams)**
-
-#### 1. Build Docker images
-
+**3. Build and run the stack:**
 ```bash
-# In repo root; note corrected Dockerfile paths!
-docker build -t meme-executor -f executor/Dockerfile ./executor
-docker build -t meme-brain -f brain/Dockerfile ./brain
+docker-compose up --build -d
 ```
+This command will:
+- Build the `executor` and `brain` images.
+- Start Redis, Prometheus, the executor, and the brain services.
+- Mount your wallet read-only into the executor.
 
-#### 2. Start Redis in Docker (secure, localhost only)
+**4. Monitor the system:**
+- **Logs:** `docker-compose logs -f executor brain`
+- **Metrics:** Open Grafana or Prometheus and point it to `http://localhost:9090`.
 
+---
+
+## 4 | Configuration
+
+All configuration is managed via environment variables in the `.env` file.
+
+### **Core Configuration**
+| Variable | Description | Example |
+|---|---|---|
+| `SOLANA_RPC_URL` | Primary Solana RPC endpoint (WebSocket). | `wss://api.mainnet-beta.solana.com` |
+| `HELIUS_API_KEY` | Helius API key for enhanced data. | `your-helius-key` |
+| `REDIS_URL` | Redis connection string. | `redis://aniper-redis:6379` |
+| `HOST_KEYPAIR_PATH`| **Absolute path** to your Solana keypair on the host. | `/home/user/.config/solana/id.json` |
+| `PLATFORMS` | Comma-separated list of platforms to snipe. | `pump.fun,LetsBonk` |
+
+### **Risk Management & Trading**
+| Variable | Description | Example |
+|---|---|---|
+| `POSITION_SIZE_PERCENT` | Percent of total portfolio value to allocate per trade. | `2.5` |
+| `LIQUIDITY_THRESHOLD` | Minimum USD liquidity a token must have to be considered. | `5000` |
+| `AUTO_SELL_PROFIT_MULTIPLIER` | Profit target to trigger auto-sell (e.g., 2.0 = 100% profit). | `2.0` |
+| `AUTO_SELL_LOSS_PERCENT` | Loss percentage to trigger auto-sell (stop-loss). | `40.0` |
+| `PORTFOLIO_STOP_LOSS_PERCENT` | Max percentage of portfolio drawdown before halting all trades. | `15.0` |
+
+### **Platform Program IDs**
+| Variable | Description |
+|---|---|
+| `PUMPFUN_PROGRAM_ID` | The on-chain program ID for pump.fun. |
+| `LETSBONK_PROGRAM_ID` | The on-chain program ID for LetsBonk. |
+
+---
+
+## 5 | Backtesting
+
+The `replay_harness.sh` script provides a powerful way to backtest the system against historical data. It reads the `PLATFORMS` variable from your `.env` file and runs a replay for each configured platform.
+
+**Usage:**
 ```bash
-docker run -d --name redis \
-  -p 6379:6379 \
-  -e REDIS_PASSWORD=yourpassword \
-  redis:alpine --requirepass yourpassword --bind 127.0.0.1
+# Ensure your .env file is configured correctly
+./scripts/replay_harness.sh
 ```
 
-> On Mac/Windows, `--network host` may not be available. Use Docker Compose’s bridge network and adjust `REDIS_URL` as needed.
-
-#### 3. Run executor and agents
-
-```bash
-docker run --env-file .env --network host meme-executor
-docker run --env-file .env --network host meme-brain
-```
-
-> On non-Linux, prefer Docker Compose for networking.
-
-#### 4. (Optional) Use Docker Compose for one-command up
-
-```yaml
-# docker-compose.yml
-version: "3"
-services:
-  redis:
-    image: redis:alpine
-    command: ["redis-server", "--requirepass", "yourpassword", "--bind", "0.0.0.0"]
-    ports: ["6379:6379"]
-  executor:
-    build: ./executor
-    env_file: .env
-    depends_on: [redis]
-    ports: ["9184:9184"]  # Exposes metrics, adjust as needed
-  brain:
-    build: ./brain
-    env_file: .env
-    depends_on: [redis]
-```
-
-```bash
-docker compose up --build
-```
-
----
-
-## 4 | Security & Environment
-
-* **Signer key:** Use `load_signer_from_kms()` or securely load a local key (`chmod 600`). Never hard-code keys in images/scripts.
-* **Redis:** Must be password protected. Never expose to public internet. Use localhost bind unless behind a VPN/firewall.
-* **Prometheus metrics:** Exported by the executor (`/metrics`, default `127.0.0.1:9184`). Expose only as needed; firewall/VPN strongly recommended.
-* **OFAC screening:** Compliance checks enforced before swaps (see AGENTS.md).
-* **No secrets in repo:** Always load from `.env` (not committed).
-* **.env.example** is provided—**keep it up to date** with all required variables.
-
----
-
-## 5 | Agent & Model Lifecycle
-
-* **Heuristic agent:** Trains LightGBM nightly, exports WASM under `models/candidate/model.wasm` (folder auto-created).
-* **LLM agents (brain/):** Narrative, red-team, coach—cron-managed, publish artifacts to Redis.
-* **Model governance:** Canary tests, manifest SHA, merge-gate and manual sign-off.
-
----
-
-## 6 | Operational Playbook
-
-| Phase  | Goal                            | How to run/test                |
-| ------ | ------------------------------- | ------------------------------ |
-| Shadow | P&L ≥ -$20 on 1,000 replay      | `./scripts/replay_harness.sh`  |
-| Canary | Live $5 trades, equity $950     | Manual run with small bankroll |
-| Ramp   | Ticket $50, equity $300         | Once canary ROI ≥ 0            |
-| Scale  | Add cross-chain/base (optional) | After week 1, if desired       |
-
-* Use `make killswitch` or set `global_halt=1` in Redis to halt instantly.
-
----
-
-## 7 | Monitoring & Metrics
-
-* **Prometheus:** Scrapes `/metrics` from the **executor** service (see `METRICS_BIND`).
-* **Key metrics:** `killswitch_total`, `restarts_total`, `risk_equity_usdc`, `risk_last_slippage`.
-* **Alerting:** Trigger on kill-switch activation, equity < $350, or slippage > 5%.
-* **Grafana dashboards:** in `docs/dashboards/latency.json`.
-
----
-
-## 8 | CI/CD & Testing
-
-* All PRs require passing:
-
-  * `cargo fmt --check`
-  * `cargo clippy --all-targets --all-features -- -D warnings`
-  * `cargo test --all --release`
-  * `pytest -q`
-  * `./scripts/replay_harness.sh --dry-run`
-* All merges require Provisioner sign-off.
-
----
-
-## 9 | Contribution Guide
-
-* Read `AGENTS.md` and `docs/AGENTS_GUIDE.md` before changes.
-* Fork → feature branch → PR (with tests).
-* All code/docs must match `.github/copilot-instructions.md`.
-* Commit messages: `<scope>: imperative, ≤50 chars summary`.
-
----
-
-## 10 | License
-
-MIT for code; models and prompts CC-BY-NC-4.0.
-
----
-
-## 11 | Contact
-
-* **Ops:** [ops@meme-sniper.xyz](mailto:ops@meme-sniper.xyz)
-* **Security:** [security@meme-sniper.xyz](mailto:security@meme-sniper.xyz)
-
----
-
-**No Kubernetes, GKE, or Terraform is required.**
-Deploy securely and with full edge on any VM or Docker host.
-
-For advanced automation or HA, see `infra/` (optional).
-
----
-
-## Running Brain (Python Agent) Tests
-
-To verify the Python agent logic and guardrails:
-
-### A) Local (development)
-```bash
-cd brain                                # enter agent directory
-python3 -m venv .venv                   # create virtualenv
-source .venv/bin/activate               # activate environment
-pip install -r requirements.txt pytest  # install dependencies + test runner
-pytest -q                               # run all agent tests
-```
-
-### B) In Docker (test mode)
-```bash
-# Build production image
-docker build -t meme-brain -f brain/Dockerfile brain
-# Run tests without modifying Dockerfile by installing pytest at runtime
-docker run --rm meme-brain bash -lc "pip install pytest && pytest -q"
-```
+The script uses mock data files located in `tests/data/` (e.g., `mock_data_pumpfun.json`). You can replace these with your own datasets for comprehensive testing.
 
 
 

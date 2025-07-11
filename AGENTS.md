@@ -26,8 +26,9 @@ inside this repository.  Any PR, commit, or merge that violates AGENTS.md
 | Rust executor | `cargo test --all --release` | ✅ |
 | Python brain  | `pytest -q`                 | ✅ |
 | WASM FFI      | `cargo test -p classifier --features wasm` | ✅ |
-| Replay harness| `./scripts/replay_harness.sh --dry-run`   | ✅ |
+| Replay harness| `./scripts/replay_harness.sh --dry-run --platforms all`   | ✅ |
 | Lint / Format | `cargo fmt --check && ruff check src/`     | ✅ |
+| Multi-platform| `./scripts/multi_platform_test.sh`         | ✅ (Tests ingest/executor for pump.fun + LetsBonk) |
 
 CI fails if **any** exit code ≠ 0 or coverage < 85 %.
 
@@ -39,6 +40,9 @@ CI fails if **any** exit code ≠ 0 or coverage < 85 %.
 3. **Model update?**              Attach JS-divergence score + canary ROI ≥ baseline.
 4. **Edge-decay analysis**        Demonstrate new heuristic does **not** reduce hit-rate on last 7 d data.
 5. **Reg / OFAC impact**          State if new code touches compliance perimeter.
+6. **Platform extension?**        If adding/modifying platforms (e.g., LetsBonk), include per-platform metrics (hit-rate, slippage) and confirm program ID integration (e.g., LanMV9sAd7wArD4vJFi2qDdfnVhFxYSUg6eADduJ3uj for LetsBonk).
+7. **Risk controls changed?**     If yes → attach Monte Carlo sim for ruin probability (<20%) and slippage caps (e.g., max 10% tolerance).
+8. **Slippage mitigation?**      Confirm pre-trade pool reserve queries and abort logic for >10% impact.
 
 ---
 
@@ -46,14 +50,16 @@ CI fails if **any** exit code ≠ 0 or coverage < 85 %.
 Every PR **must attach**:
 * `ci_logs.txt` — full test output.
 * `bench_latency.json` — p95 before/after (executor).
-* `edge_metrics.csv` — hit-rate, slippage, P&L delta on 24 h replay.
+* `edge_metrics.csv` — hit-rate, slippage, P&L delta on 24 h replay (per-platform if multi).
+* `ruin_sim_results.json` — Monte Carlo outputs for risk model (if controls touched).
 
 ---
 
 ## 5. Manual Review Steps (Provisioner)
 1. Read PR description & audit answers.
-2. Download `edge_metrics.csv`; spot-check ≥ 3 trades.
-3. If satisfied, comment `LGTM & MERGE OK`.  
+2. Download `edge_metrics.csv`; spot-check ≥ 3 trades per platform.
+3. Verify slippage checks in executor code.
+4. If satisfied, comment `LGTM & MERGE OK`.  
    Otherwise, comment `BLOCKED: <reason>`.
 
 ---
@@ -61,17 +67,17 @@ Every PR **must attach**:
 ## 6. Architecture **Invariant Guards**
 * **ARCH-BREACH** if any LLM call appears in executor path (`executor/**`).
 * **ARCH-BREACH** if WASM classifier replaced by runtime Python.
+* **ARCH-BREACH** if multi-platform ingest adds >5 ms latency to single-platform baseline.
 * CI greps for `openai` / `async_openai` inside `executor/**` and fails.
 
 ---
 
 ## 7. Model Governance
 * New `model.wasm` lands in `models/candidate/`.
-* CI runs `./scripts/canary_test.sh models/candidate/model.wasm`.
+* CI runs `./scripts/canary_test.sh models/candidate/model.wasm --platforms all`.
 * If ROI ↑ and JS-divergence ≤ 0.25 → auto-move to `models/prod/`.
 * Provisioner final sign-off required in PR.
-* For implementation details of runtime LLM agents see docs/AGENTS_GUIDE.md
-
+* For implementation details of runtime LLM agents see docs/AGENTS_GUIDE.md. Platform-specific prompts (e.g., X queries for LetsBonk) must be versioned and tested for reflexivity scoring.
 
 ---
 
@@ -88,6 +94,7 @@ Every PR **must attach**:
 | CI fails | `#ops-ci` |
 | Latency spike | `#hft-infra` |
 | Security incident | `#sec-hot` |
+| Platform decay (e.g., LetsBonk share drop) | `#edge-monitor` |
 
 ---
 
