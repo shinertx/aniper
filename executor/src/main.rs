@@ -2,6 +2,7 @@ use anyhow::Result;
 use clap::{Parser, Subcommand};
 use executor::risk;
 use executor::{metrics, trader, ws_feed};
+use std::time::Duration;
 use tracing_subscriber::EnvFilter;
 
 #[derive(Parser)]
@@ -36,7 +37,13 @@ enum Commands {}
 
 #[tokio::main]
 async fn main() -> Result<()> {
+    // Parse CLI args - this will automatically handle --help and exit
     let cli = Cli::parse();
+
+    // Early exit for help/version (redundant safety check)
+    if std::env::args().any(|arg| arg == "--help" || arg == "-h") {
+        return Ok(());
+    }
 
     tracing_subscriber::fmt()
         .with_env_filter(EnvFilter::from_default_env())
@@ -62,7 +69,7 @@ async fn main() -> Result<()> {
     } else {
         tokio::spawn(ws_feed::run(feed_tx));
     }
-    
+
     tokio::spawn(trader::run(feed_rx, slip_tx.clone()));
 
     // --- Risk management ---------------------------------------------------
@@ -99,6 +106,9 @@ async fn main() -> Result<()> {
     tokio::spawn(async {
         metrics::serve_prometheus().await;
     });
-    std::future::pending::<()>().await;
-    Ok(())
+
+    // Keep the main thread alive to allow background tasks to run
+    loop {
+        tokio::time::sleep(Duration::from_secs(60)).await;
+    }
 }

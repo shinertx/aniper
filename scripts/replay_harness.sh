@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# Ignore SIGINT (Ctrl+C) to prevent interruptions from the environment
+trap '' INT
+
 # --- Configuration ---
 MOCK_DATA_DIR="tests/data"
 DEFAULT_MOCK_DATA="$MOCK_DATA_DIR/mock_data.json"
@@ -18,6 +21,8 @@ error() {
 # --- Argument Parsing ---
 DRY_RUN=false
 PLATFORMS_ARG=""
+HISTORICAL=false
+
 # Handle named arguments first
 while [[ $# -gt 0 ]]; do
     key="$1"
@@ -31,6 +36,10 @@ while [[ $# -gt 0 ]]; do
         shift # past argument
         shift # past value
         ;;
+        --historical)
+        HISTORICAL=true
+        shift # past argument
+        ;;
         *)    # unknown option, assume it's a platform name
         break
         ;;
@@ -42,6 +51,29 @@ if [ "$DRY_RUN" = true ]; then
 fi
 
 # --- Main Logic ---
+
+# Handle historical replay first as it's a special case
+if [ "$HISTORICAL" = true ]; then
+    info "Executing historical data replay..."
+    historical_data_file="tests/data/historical_data.parquet"
+    if [ ! -f "$historical_data_file" ]; then
+        error "Historical data file not found: $historical_data_file. Please run scripts/ingest_historical_data.py first."
+    fi
+
+    info "Using historical data file: $historical_data_file"
+    info "NOTE: This simulates the full historical dataset and may take a significant amount of time."
+
+    # Assuming the executor can handle a .parquet file directly for replay
+    cmd="cargo run --release --bin executor -- --replay $historical_data_file"
+
+    if [ "$DRY_RUN" = true ]; then
+        echo "DRY RUN CMD: $cmd"
+    else
+        eval "$cmd"
+    fi
+    exit 0
+fi
+
 
 # Function to run replay for a given platform and data file
 run_replay() {

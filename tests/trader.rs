@@ -1,11 +1,11 @@
 use executor::trader;
 use executor::ws_feed::LaunchEvent;
 use mockito::Server;
-use tokio::sync::mpsc;
+use solana_sdk::signature::{write_keypair_file, Keypair};
 use std::process::{Command, Stdio};
 use std::time::Duration;
 use tempfile::NamedTempFile;
-use solana_sdk::signature::{Keypair, write_keypair_file};
+use tokio::sync::mpsc;
 
 /// Helper to start a local `solana-test-validator`. Skips the test if the binary
 /// is not available in the current PATH.
@@ -24,8 +24,12 @@ fn start_test_validator() -> Option<std::process::Child> {
 
     // Allow node to boot – keep retry short to avoid CI stalls.
     for _ in 0..10 {
-        if let Ok(slot) = solana_client::rpc_client::RpcClient::new("http://127.0.0.1:8899").get_slot() {
-            if slot > 0 { break; }
+        if let Ok(slot) =
+            solana_client::rpc_client::RpcClient::new("http://127.0.0.1:8899").get_slot()
+        {
+            if slot > 0 {
+                break;
+            }
         }
         std::thread::sleep(Duration::from_millis(500));
     }
@@ -56,12 +60,16 @@ async fn trade_flow_confirmed() {
     std::env::set_var("JUPITER_API", &jupiter_api_url);
 
     // Mock new Jupiter endpoints to force fallback path.
-    let _m_quote = server.mock("GET", "/quote")
+    let _m_quote = server
+        .mock("GET", "/quote")
         .with_status(500)
-        .create_async().await;
-    let _m_swap = server.mock("GET", "/swap")
+        .create_async()
+        .await;
+    let _m_swap = server
+        .mock("GET", "/swap")
         .with_status(500)
-        .create_async().await;
+        .create_async()
+        .await;
 
     let (tx, rx) = mpsc::channel(1);
     let (slip_tx, _slip_rx) = mpsc::channel(4);
@@ -92,22 +100,22 @@ fn test_rpc_url_fallback() {
     std::env::remove_var("SOLANA_RPC_URL");
     std::env::remove_var("SOLANA_URL");
     std::env::remove_var("RPC_URL");
-    
+
     // Test default fallback
     let url = executor::trader::rpc_url();
     assert!(url.contains("api.devnet.solana.com") || url.contains("127.0.0.1:8899"));
-    
+
     // Test SOLANA_RPC_URL takes priority
     std::env::set_var("SOLANA_RPC_URL", "http://custom.example.com");
     let url = executor::trader::rpc_url();
     assert_eq!(url, "http://custom.example.com");
-    
+
     // Test fallback chain
     std::env::remove_var("SOLANA_RPC_URL");
     std::env::set_var("SOLANA_URL", "http://fallback.example.com");
     let url = executor::trader::rpc_url();
     assert_eq!(url, "http://fallback.example.com");
-    
+
     // Cleanup
     std::env::remove_var("SOLANA_URL");
 }

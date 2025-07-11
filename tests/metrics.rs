@@ -1,7 +1,6 @@
 use executor::metrics;
 use metrics_exporter_prometheus::PrometheusBuilder;
 use once_cell::sync::Lazy;
-use tokio;
 
 // Ensure a single global Prometheus recorder is installed for all tests.
 static HANDLE: Lazy<metrics_exporter_prometheus::PrometheusHandle> = Lazy::new(|| {
@@ -78,9 +77,15 @@ async fn restart_counter_increments_across_startups() {
 fn extract_counter(body: &str, name: &str, label_filter: &str) -> Option<u64> {
     for line in body.lines() {
         // Skip comments.
-        if line.starts_with('#') { continue; }
-        if !line.starts_with(name) { continue; }
-        if !label_filter.is_empty() && !line.contains(label_filter) { continue; }
+        if line.starts_with('#') {
+            continue;
+        }
+        if !line.starts_with(name) {
+            continue;
+        }
+        if !label_filter.is_empty() && !line.contains(label_filter) {
+            continue;
+        }
         // Split whitespace to obtain value.
         if let Some(val_str) = line.split_whitespace().nth(1) {
             if let Ok(v) = val_str.parse::<u64>() {

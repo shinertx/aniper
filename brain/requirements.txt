@@ -6,4 +6,6 @@ lightgbm
 numpy
 pyyaml
 httpx
-redis 
+redis
+faker
+fastparquet

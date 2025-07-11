@@ -1,4 +1,4 @@
-use executor::classifier::{score, load_wasm};
+use executor::classifier::{load_wasm, score};
 use executor::ws_feed::{LaunchEvent, Platform};
 
 #[test]

@@ -12,6 +12,7 @@ use std::str::FromStr;
 use std::sync::{Arc, RwLock};
 use std::time::{Duration, Instant};
 use tokio::sync::mpsc::Receiver;
+use tracing::info;
 
 use reqwest::Client;
 use solana_client::rpc_client::RpcClient;
@@ -68,7 +69,11 @@ impl RiskConfig {
     fn refresh() {
         let mut config = RISK_CONFIG.write().unwrap();
         *config = RiskConfig::from_env();
-        tracing::info!(target = "trade", "Refreshed risk configuration: {:?}", *config);
+        tracing::info!(
+            target = "trade",
+            "Refreshed risk configuration: {:?}",
+            *config
+        );
     }
 }
 
@@ -358,6 +363,7 @@ pub async fn run(
     mut rx: Receiver<LaunchEvent>,
     slip_tx: tokio::sync::mpsc::Sender<f64>,
 ) -> Result<()> {
+    info!(target = "startup", "Initializing trader module...");
     // Initialise once outside the loop.
     let rpc = RpcClient::new_with_commitment(rpc_url(), CommitmentConfig::processed());
 
@@ -387,7 +393,10 @@ pub async fn run(
     // Connect to Redis for manual trade signals
     let redis_client = RedisClient::open("redis://redis:6379")?;
     let mut redis_conn = redis_client.get_async_connection().await?;
-    tracing::info!(target = "trade", "Connected to Redis for manual trade signals");
+    tracing::info!(
+        target = "trade",
+        "Connected to Redis for manual trade signals"
+    );
 
     // Deduplication: Track processed (mint, creator) pairs for 5 minutes
     let mut processed_events: HashSet<(String, String)> = HashSet::new();
@@ -466,6 +475,8 @@ pub async fn run(
                 tracing::info!(target = "trade", "Processing WebSocket launch event for mint {} from {:?}", ev.mint, ev.platform);
                 if let Err(e) = execute_trade(&rpc, &keypair, &ev, &slip_tx).await {
                     tracing::error!(target = "trade", "Trade execution failed: {}", e);
+                    // Send a zero slippage sample even on trade failure for monitoring
+                    let _ = slip_tx.send(0.0).await;
                 }
             }
 
@@ -518,25 +529,31 @@ async fn execute_trade(
     let position_size_lamports = (position_size_usdc * 1_000_000.0) as u64;
 
     // Build swap TX or fall back.
-    let buy_swap = match fetch_swap_tx(rpc, keypair, &ev.mint, Some(position_size_lamports), None).await {
-        Ok(t) => t,
-        Err(e) => {
-            tracing::warn!(
-                target = "trade",
-                "swap construction failed – falling back: {e}"
-            );
-            SwapTx {
-                tx: fallback_transfer_tx(rpc, keypair)?,
-                price: 0.0,
+    let buy_swap =
+        match fetch_swap_tx(rpc, keypair, &ev.mint, Some(position_size_lamports), None).await {
+            Ok(t) => t,
+            Err(e) => {
+                tracing::warn!(
+                    target = "trade",
+                    "swap construction failed – falling back: {e}"
+                );
+                SwapTx {
+                    tx: fallback_transfer_tx(rpc, keypair)?,
+                    price: 0.0,
+                }
             }
-        }
-    };
+        };
 
     // Broadcast.
     let platform_str = format!("{:?}", ev.platform).to_lowercase();
     let sig = sign_and_send(&[rpc_url()], &buy_swap.tx, keypair)?;
     inc_trades_submitted(&platform_str);
-    tracing::info!(target = "trade", "Submitted buy tx: {sig} for {:.2} USDC on {}", position_size_usdc, platform_str);
+    tracing::info!(
+        target = "trade",
+        "Submitted buy tx: {sig} for {:.2} USDC on {}",
+        position_size_usdc,
+        platform_str
+    );
     wait_for_confirmation(rpc, &sig)?;
     inc_trades_confirmed(&platform_str);
     tracing::info!(target = "trade", "Buy confirmed: {sig}");

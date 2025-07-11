@@ -2,12 +2,17 @@ use base64::engine::general_purpose::STANDARD as BASE64_STD;
 use base64::Engine;
 use metrics_exporter_prometheus::PrometheusBuilder;
 use std::net::SocketAddr;
+use tracing::info;
 
 // NEW: remove single-thread Tokio runtime builder
 // use tokio::runtime::Builder;
 
 /// NEW: make function async to run on the main Tokio runtime
 pub async fn serve_prometheus() {
+    info!(
+        target = "startup",
+        "Initializing Prometheus metrics server..."
+    );
     let builder = PrometheusBuilder::new();
     let handle = builder.install_recorder().expect("metrics recorder");
 
@@ -19,7 +24,7 @@ pub async fn serve_prometheus() {
 
     // REMOVED: std::thread::spawn(move || {
     let addr: SocketAddr = std::env::var("METRICS_BIND")
-        .unwrap_or_else(|_| "127.0.0.1:9184".into())
+        .unwrap_or_else(|_| "127.0.0.1:9185".into())
         .parse()
         .expect("invalid METRICS_BIND address");
 

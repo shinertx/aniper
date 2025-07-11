@@ -8,6 +8,9 @@ use tracing::{error, info, warn};
  * NEW: anyhow for ergonomic Result
  * ---------------------------------------------------------------------- */
 use anyhow::{anyhow, Context, Result};
+use std::fs::File;
+use std::io::{BufRead, BufReader};
+use std::path::Path;
 
 // --- JSON-RPC Deserialization Structures ---
 #[derive(Deserialize, Debug)]
@@ -64,6 +67,21 @@ pub struct LaunchEvent {
     pub max_slippage: Option<f64>,
 }
 
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct HistoricalEvent {
+    pub timestamp: String,
+    pub platform: String,
+    pub token_address: String,
+    pub creator_address: String,
+    pub name: String,
+    pub symbol: String,
+    pub description: String,
+    pub market_cap_usd: f64,
+    pub trade_volume_24h: f64,
+    pub is_rugpull: bool,
+    pub raw_event_data: String,
+}
+
 const MAX_MSG_LEN: usize = 65536; // Increased for verbose log messages
 
 /// Extracts a value from a log line given a prefix.
@@ -98,64 +116,85 @@ pub fn normalise_message(raw: &str, platform: Platform) -> Option<LaunchEvent> {
 
     let logs = &notification.params.result.value.logs;
 
-    // Check for a "Create" or "Initialize" instruction log, which signals a new token.
-    // This is a common pattern for launchpads.
-    let is_create_instruction = logs.iter().any(|log| {
-        log.contains("Instruction: Create") || log.contains("Instruction: Initialize")
-    });
-
-    if !is_create_instruction {
+    // Check for a specific log message that indicates a new LP has been added.
+    if !logs.iter().any(|log| log.contains("initialize2")) {
         return None;
     }
 
-    // Parse mint and creator from the logs. This is highly specific to the
-    // on-chain program's logging format.
-    // Example log format: "Program log: creator: CREATOR_PUBKEY"
-    // Example log format: "Program log: mint: MINT_PUBKEY"
-    let mint = logs.iter().find_map(|log| extract_from_log(log, "mint: "));
-    let creator = logs.iter().find_map(|log| extract_from_log(log, "creator: "));
+    let mut mint = None;
+    let mut creator = None;
+    let mut holders_60 = None;
+    let mut lp = None;
 
-    if let (Some(mint), Some(creator)) = (mint, creator) {
-        if mint.is_empty() || creator.is_empty() {
-            return None;
+    for log in logs {
+        if let Some(val) = extract_from_log(log, "Program log: mint: ") {
+            mint = Some(val);
         }
-        info!(target: "ws_feed", "Detected new token on {:?}: mint={}, creator={}", platform, mint, creator);
+        if let Some(val) = extract_from_log(log, "Program log: creator: ") {
+            creator = Some(val);
+        }
+        if let Some(val) = extract_from_log(log, "Program log: holders_60: ") {
+            holders_60 = val.parse::<u32>().ok();
+        }
+        if let Some(val) = extract_from_log(log, "Program log: lp: ") {
+            lp = val.parse::<f64>().ok();
+        }
+    }
+
+    if let (Some(mint), Some(creator), Some(holders_60), Some(lp)) = (mint, creator, holders_60, lp)
+    {
         Some(LaunchEvent {
             mint,
             creator,
-            // LP and holder counts are not available from the initial launch logs.
-            // This data would need to be fetched via subsequent RPC calls or from
-            // an external enrichment service before being sent to the trader.
-            // For now, we use placeholders. The trader logic will need to handle this.
-            holders_60: 0,
-            lp: 0.0,
+            holders_60,
+            lp,
             platform,
-            amount_usdc: None,
-            max_slippage: None,
+            amount_usdc: None,  // Default, can be overridden by agent
+            max_slippage: None, // Default, can be overridden by agent
         })
     } else {
         None
     }
 }
 
-/// Runs the replay mode, reading events from a JSON file and sending them to the trader.
+/// Replays events from a file, sending them to the trader.
 pub async fn run_replay(file_path: String, tx: Sender<LaunchEvent>) -> Result<()> {
-    info!(target = "ws_feed", "Starting replay from file: {}", file_path);
-    let file_content = std::fs::read_to_string(&file_path)
-        .with_context(|| format!("Failed to read replay file: {}", file_path))?;
+    info!(
+        target = "ws_feed",
+        "Starting replay from file: {}", file_path
+    );
 
-    // Assuming the file contains a JSON array of LaunchEvent
-    let events: Vec<LaunchEvent> = serde_json::from_str(&file_content)
-        .with_context(|| "Failed to parse replay file JSON")?;
+    let path = Path::new(&file_path);
+    let extension = path.extension().and_then(|s| s.to_str());
 
-    for event in events {
-        info!(target = "ws_feed", "Replaying event for mint: {}", event.mint);
-        if let Err(e) = tx.send(event).await {
-            error!(target = "ws_feed", "Failed to send replayed event to trader: {}", e);
-            break; // Stop replay on channel error
+    match extension {
+        Some("json") => {
+            let file = File::open(path).context("Failed to open JSON replay file")?;
+            let reader = BufReader::new(file);
+            for line in reader.lines() {
+                let line = line.context("Failed to read line from replay file")?;
+                if let Ok(event) = serde_json::from_str::<LaunchEvent>(&line) {
+                    if tx.send(event).await.is_err() {
+                        error!("Receiver dropped, stopping replay");
+                        break;
+                    }
+                }
+            }
         }
-        // Add a small delay to simulate real-time event flow
-        tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
+        Some("parquet") => {
+            // This is a simplified placeholder for Parquet reading.
+            // For a real implementation, you would use a library like `arrow` or `parquet`.
+            // This example will just log a message.
+            warn!(target: "ws_feed", "Parquet replay is a placeholder. No events will be sent.");
+            info!(target: "ws_feed", "Simulating a long-running historical replay...");
+            // In a real scenario, you'd loop through Parquet row groups here.
+            // For now, we just sleep to simulate work.
+            tokio::time::sleep(tokio::time::Duration::from_secs(10)).await;
+            info!(target: "ws_feed", "Finished simulated historical replay.");
+        }
+        _ => {
+            return Err(anyhow!("Unsupported replay file format: {:?}", extension));
+        }
     }
 
     info!(target = "ws_feed", "Replay finished.");
@@ -189,7 +228,7 @@ async fn subscribe_platform(
 
     let (mut ws, _) = connect_async(&url)
         .await
-        .with_context(|| format!("Failed to connect to WebSocket at {}", url))?;
+        .with_context(|| format!("Failed to connect to WebSocket at {url}"))?;
 
     let subscribe_request = serde_json::json!({
         "jsonrpc": "2.0",
@@ -212,7 +251,7 @@ async fn subscribe_platform(
     // We can store this ID if we want to unsubscribe later.
     if let Some(Ok(Message::Text(msg))) = ws.next().await {
         if !msg.contains("result") {
-            warn!(target="ws_feed", "Subscription may have failed: {}", msg);
+            warn!(target = "ws_feed", "Subscription may have failed: {}", msg);
         }
     }
 
@@ -221,16 +260,25 @@ async fn subscribe_platform(
             Ok(Message::Text(txt)) => {
                 if let Some(ev) = normalise_message(&txt, platform) {
                     if let Err(e) = tx.send(ev).await {
-                        warn!(target = "ws_feed", "Failed to send event to trader channel: {}", e);
+                        warn!(
+                            target = "ws_feed",
+                            "Failed to send event to trader channel: {}", e
+                        );
                     }
                 }
             }
             Ok(Message::Close(close_frame)) => {
-                warn!(target = "ws_feed", "WebSocket stream closed for {:?}: {:?}", platform, close_frame);
+                warn!(
+                    target = "ws_feed",
+                    "WebSocket stream closed for {:?}: {:?}", platform, close_frame
+                );
                 break;
             }
             Err(e) => {
-                warn!(target = "ws_feed", "WebSocket stream error for {:?}: {}", platform, e);
+                warn!(
+                    target = "ws_feed",
+                    "WebSocket stream error for {:?}: {}", platform, e
+                );
                 break;
             }
             _ => {}
@@ -243,15 +291,16 @@ async fn subscribe_platform(
 pub async fn run(tx: Sender<LaunchEvent>) -> Result<()> {
     use std::time::Duration;
 
-    let platforms_str =
-        std::env::var("PLATFORMS").unwrap_or_else(|_| "pumpfun".to_string());
+    let platforms_str = std::env::var("PLATFORMS").unwrap_or_else(|_| "pumpfun".to_string());
     let platforms: Vec<Platform> = platforms_str
         .split(',')
         .filter_map(|s| s.trim().parse().ok())
         .collect();
 
     if platforms.is_empty() {
-        return Err(anyhow!("No valid platforms configured in PLATFORMS env var."));
+        return Err(anyhow!(
+            "No valid platforms configured in PLATFORMS env var."
+        ));
     }
 
     let mut handles = vec![];
@@ -266,14 +315,24 @@ pub async fn run(tx: Sender<LaunchEvent>) -> Result<()> {
             let tx_clone = tx.clone();
             let handle = tokio::spawn(async move {
                 loop {
-                    info!(target = "ws_feed", "Starting subscription for {:?}...", platform);
+                    info!(
+                        target = "ws_feed",
+                        "Starting subscription for {:?}...", platform
+                    );
                     match subscribe_platform(tx_clone.clone(), platform, program_id.clone()).await {
                         Ok(_) => {
                             // This should not happen as subscribe_platform should run indefinitely
-                            warn!(target = "ws_feed", "Subscription for {:?} ended unexpectedly without an error.", platform);
+                            warn!(
+                                target = "ws_feed",
+                                "Subscription for {:?} ended unexpectedly without an error.",
+                                platform
+                            );
                         }
                         Err(e) => {
-                            warn!(target = "ws_feed", "Subscription for {:?} failed: {}. Retrying in 5s.", platform, e);
+                            warn!(
+                                target = "ws_feed",
+                                "Subscription for {:?} failed: {}. Retrying in 5s.", platform, e
+                            );
                         }
                     }
                     tokio::time::sleep(Duration::from_secs(5)).await;
@@ -281,7 +340,12 @@ pub async fn run(tx: Sender<LaunchEvent>) -> Result<()> {
             });
             handles.push(handle);
         } else {
-            warn!(target = "ws_feed", "Program ID for {:?} not found in environment variables (expected {}).", platform, program_id_key);
+            warn!(
+                target = "ws_feed",
+                "Program ID for {:?} not found in environment variables (expected {}).",
+                platform,
+                program_id_key
+            );
         }
     }
 

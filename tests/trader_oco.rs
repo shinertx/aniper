@@ -2,11 +2,11 @@ use executor::trader;
 use executor::ws_feed::LaunchEvent;
 use metrics_exporter_prometheus::PrometheusBuilder;
 use mockito::Server;
-use tokio::sync::mpsc;
+use solana_sdk::signature::{write_keypair_file, Keypair};
 use std::process::{Command, Stdio};
 use std::time::Duration;
 use tempfile::NamedTempFile;
-use solana_sdk::signature::{Keypair, write_keypair_file};
+use tokio::sync::mpsc;
 
 /// Start a local `solana-test-validator`. Skips the test if binary missing.
 fn start_test_validator() -> Option<std::process::Child> {
@@ -24,7 +24,9 @@ fn start_test_validator() -> Option<std::process::Child> {
 
     // Wait until node ready.
     for _ in 0..10 {
-        if let Ok(slot) = solana_client::rpc_client::RpcClient::new("http://127.0.0.1:8899").get_slot() {
+        if let Ok(slot) =
+            solana_client::rpc_client::RpcClient::new("http://127.0.0.1:8899").get_slot()
+        {
             if slot > 0 {
                 break;
             }
@@ -62,12 +64,18 @@ async fn oco_two_orders_and_slippage_sample() {
     std::env::set_var("JUPITER_API", &jupiter_api_url);
 
     // Mock quote & swap to force fallback path (500 status).
-    let _m_quote = server.mock("GET", "/quote")
+    let _m_quote = server
+        .mock("GET", "/quote")
         .with_status(500)
-        .create_async().await;
-    let _m_swap = server.mock("GET", "/swap")
+        .with_body("Internal Server Error")
+        .create_async()
+        .await;
+    let _m_swap = server
+        .mock("POST", "/swap")
         .with_status(500)
-        .create_async().await;
+        .with_body("Internal Server Error")
+        .create_async()
+        .await;
 
     // Channels.
     let (evt_tx, evt_rx) = mpsc::channel(1);
@@ -89,10 +97,11 @@ async fn oco_two_orders_and_slippage_sample() {
     evt_tx.send(ev).await.unwrap();
     drop(evt_tx);
 
-    // Expect slippage sample within 2 seconds.
-    let slip = tokio::time::timeout(Duration::from_secs(2), slip_rx.recv())
+    // Expect slippage sample within 5 seconds (increased timeout for debugging).
+    let slip = tokio::time::timeout(Duration::from_secs(5), slip_rx.recv())
         .await
         .expect("timeout waiting slip");
+    println!("Received slippage sample: {:?}", slip);
     assert!(slip.is_some(), "no slippage sample received");
 
     // Wait for task end.

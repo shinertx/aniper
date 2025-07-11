@@ -32,6 +32,8 @@ WORKDIR /app
 COPY --from=builder /app/target/release/executor /usr/local/bin/executor
 ENV RUST_LOG=info
 EXPOSE 9184
+# Expose the metrics port
+EXPOSE 9185
 # Optional: use a non-root user for security
 # RUN useradd -m appuser && chown -R appuser /app
 # USER appuser

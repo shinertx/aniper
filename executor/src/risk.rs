@@ -8,7 +8,7 @@
 //    configured percentage from its peak.
 // ---------------------------------------------------------------------------
 
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, Context, Result};
 use once_cell::sync::Lazy;
 use solana_client::rpc_client::RpcClient;
 use solana_sdk::signature::read_keypair_file;
@@ -16,6 +16,7 @@ use solana_sdk::signer::Signer;
 use std::sync::atomic::{AtomicU64, Ordering};
 use tokio::sync::{broadcast::Sender, mpsc::Receiver};
 use tokio::time::{sleep, Duration};
+use tracing::info;
 
 use crate::metrics::{
     set_risk_equity_usdc, set_risk_last_slippage, set_risk_portfolio_stop_loss,
@@ -88,9 +89,9 @@ pub async fn get_balance_usdc() -> Result<f64> {
 // ---------------------------------------------------------------------------
 
 async fn redis_f64(key: &str) -> Option<f64> {
-    let url = std::env::var("REDIS_URL").unwrap_or_else(|_| {
-        panic!("REDIS_URL not set – refusing to start (risk module)");
-    });
+    let url = std::env::var("REDIS_URL")
+        .with_context(|| "REDIS_URL not set – refusing to start (risk module)")
+        .unwrap();
 
     if let Ok(client) = redis::Client::open(url) {
         if let Ok(mut conn) = client.get_async_connection().await {
@@ -114,6 +115,11 @@ async fn redis_f64(key: &str) -> Option<f64> {
 /// Spawns the equity-floor and slippage sentinels.  Returns immediately – the
 /// inner tasks run for the lifetime of the executor process.
 pub async fn run(kill_tx: Sender<KillSwitch>, mut slippage_rx: Receiver<f64>) -> Result<()> {
+    info!(target = "startup", "Initializing risk module...");
+    // Ensure REDIS_URL is set, otherwise refuse to start.
+    let _redis_url = std::env::var("REDIS_URL")
+        .with_context(|| "REDIS_URL not set – refusing to start (risk module)")?;
+
     let poll_ms: u64 = std::env::var("RISK_EQUITY_POLL_MS")
         .ok()
         .and_then(|v| v.parse().ok())
@@ -167,13 +173,16 @@ pub async fn run(kill_tx: Sender<KillSwitch>, mut slippage_rx: Receiver<f64>) ->
                     if !initialized {
                         peak_equity = bal;
                         initialized = true;
-                        tracing::info!(target = "risk", "Initialized portfolio peak equity at {:.2} USDC", peak_equity);
+                        tracing::info!(
+                            target = "risk",
+                            "Initialized portfolio peak equity at {:.2} USDC",
+                            peak_equity
+                        );
                     } else {
                         peak_equity = peak_equity.max(bal);
                     }
 
-                    let stop_loss_level =
-                        peak_equity * (1.0 - (stop_loss_percent / 100.0));
+                    let stop_loss_level = peak_equity * (1.0 - (stop_loss_percent / 100.0));
 
                     set_risk_portfolio_stop_loss(stop_loss_level);
 
@@ -243,6 +252,95 @@ pub async fn run(kill_tx: Sender<KillSwitch>, mut slippage_rx: Receiver<f64>) ->
             }
         }
     });
+
+    Ok(())
+}
+
+// Equity Floor --------------------------------------------------------------
+// ---------------------------------------------------------------------------
+async fn redis_get_equity_floor_usdc() -> Result<f64> {
+    Ok(redis_f64("risk:equity_floor_usdc").await.unwrap_or(300.0))
+}
+
+pub async fn equity_floor_check(tx: Sender<KillSwitch>) -> Result<()> {
+    let floor = redis_get_equity_floor_usdc().await?;
+    let balance = get_balance_usdc().await?;
+    set_risk_equity_usdc(balance);
+
+    if balance < floor {
+        tx.send(KillSwitch::EquityFloor)?;
+        return Err(anyhow!("Equity floor breached: {} < {}", balance, floor));
+    }
+    Ok(())
+}
+
+// ---------------------------------------------------------------------------
+// Slippage Sentinel ---------------------------------------------------------
+// ---------------------------------------------------------------------------
+
+/// Fetches the dynamic slippage threshold from Redis.
+/// Defaults to a conservative 25% if not set.
+async fn redis_get_slippage_threshold() -> Result<f64> {
+    Ok(redis_f64("risk:slippage_threshold_percent")
+        .await
+        .unwrap_or(25.0))
+}
+
+/// The core slippage check.
+///
+/// # Arguments
+/// * `realised_slippage` - The slippage observed in a completed trade.
+/// * `tx` - The broadcast channel to send a kill-switch signal on.
+pub async fn slippage_check(realised_slippage: f64, tx: Sender<KillSwitch>) -> Result<()> {
+    set_risk_last_slippage(realised_slippage);
+    let threshold = redis_get_slippage_threshold().await?;
+    set_risk_slippage_threshold(threshold);
+
+    if realised_slippage > threshold {
+        tx.send(KillSwitch::Slippage)?;
+        return Err(anyhow!(
+            "Slippage threshold breached: {} > {}",
+            realised_slippage,
+            threshold
+        ));
+    }
+    Ok(())
+}
+
+// ---------------------------------------------------------------------------
+// Portfolio Stop-Loss -------------------------------------------------------
+// ---------------------------------------------------------------------------
+
+/// Fetches the portfolio stop-loss percentage from Redis.
+/// Defaults to 20% if not set.
+async fn redis_get_portfolio_stop_loss_percent() -> Result<f64> {
+    Ok(redis_f64("risk:portfolio_stop_loss_percent")
+        .await
+        .unwrap_or(20.0))
+}
+
+/// The core portfolio stop-loss check.
+///
+/// # Arguments
+/// * `tx` - The broadcast channel to send a kill-switch signal on.
+pub async fn portfolio_stop_loss_check(tx: Sender<KillSwitch>) -> Result<()> {
+    let stop_loss_percent = redis_get_portfolio_stop_loss_percent().await?;
+    set_risk_portfolio_stop_loss(stop_loss_percent);
+
+    // TODO: This needs to track historical portfolio value.
+    // For now, we'll just use the current balance as a placeholder.
+    let current_value = get_balance_usdc().await?;
+    let peak_value = f64::max(current_value, 0.0); // Placeholder
+
+    if current_value < peak_value * (1.0 - stop_loss_percent / 100.0) {
+        tx.send(KillSwitch::PortfolioStopLoss)?;
+        return Err(anyhow!(
+            "Portfolio stop-loss breached: {} < {} * (1 - {})",
+            current_value,
+            peak_value,
+            stop_loss_percent
+        ));
+    }
 
     Ok(())
 }

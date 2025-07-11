@@ -63,6 +63,7 @@ services:
     container_name: aniper-prometheus
     ports:
       - "9090:9090"
+      - "9185:9185"
     volumes:
       - ./prometheus.yml:/etc/prometheus/prometheus.yml
     command:

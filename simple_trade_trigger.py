@@ -153,8 +153,8 @@ def main():
     
     print(f"\n💡 Next steps:")
     print(f"   📋 Check executor logs: docker logs aniper-executor --tail 20")
-    print(f"   📊 Check metrics: curl http://localhost:9184/metrics")
-    print(f"   🔍 Check health: curl http://localhost:9184/health")
+    print(f"   📊 Check metrics: curl http://localhost:9185/metrics")
+    print(f"   🔍 Check health: curl http://localhost:9185/health")
     print(f"   💰 Check wallet: May need USDC funding for actual swaps")
 
 if __name__ == "__main__":

@@ -3,6 +3,9 @@ global:
 
 scrape_configs:
   - job_name: 'executor'
-    scrape_interval: 5s
     static_configs:
-      - targets: ['executor:9184']
+      - targets: ['executor:9185']
+
+  - job_name: 'brain'
+    static_configs:
+      - targets: ['brain:9100']
