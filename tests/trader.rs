@@ -72,6 +72,8 @@ async fn trade_flow_confirmed() {
         holders_60: 100,
         lp: 99999.0, // Set high to pass liquidity check
         platform: executor::ws_feed::Platform::PumpFun,
+        amount_usdc: None,
+        max_slippage: None,
     };
     tx.send(ev).await.unwrap();
     drop(tx); // close channel so trader exits after processing.

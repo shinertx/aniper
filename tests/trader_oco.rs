@@ -83,6 +83,8 @@ async fn oco_two_orders_and_slippage_sample() {
         holders_60: 120,
         lp: 1.1,
         platform: executor::ws_feed::Platform::PumpFun,
+        amount_usdc: None,
+        max_slippage: None,
     };
     evt_tx.send(ev).await.unwrap();
     drop(evt_tx);

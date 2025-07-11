@@ -266,32 +266,3 @@ pub async fn run(tx: Sender<LaunchEvent>) -> Result<()> {
 
     Ok(())
 }
-
-/// Process log messages for the PumpFun platform.
-fn process_log_messages(logs: &[String], tx: &Sender<LaunchEvent>) {
-    use solana_program::pubkey::Pubkey;
-    use std::str::FromStr;
-
-    // Extract mint, creator, and LP values from logs
-    let mint_opt = logs.iter().find_map(|log| extract_from_log(log, "mint: "));
-    let creator_opt = logs.iter().find_map(|log| extract_from_log(log, "creator: "));
-    let lp_opt = logs.iter().find_map(|log| extract_from_log(log, "lp: "));
-
-    // Ensure all values are present
-    if let (Some(mint), Some(creator), Some(lp_str)) = (mint_opt, creator_opt, lp_opt) {
-        if let Ok(lp) = lp_str.parse::<f64>() {
-            let event = LaunchEvent {
-                mint,
-                creator,
-                holders_60: 0, // Placeholder, will be updated
-                lp,
-                platform: Platform::PumpFun,
-                amount_usdc: None,
-                max_slippage: None,
-            };
-            if let Err(e) = tx.send(event) {
-                error!("Failed to send launch event: {}", e);
-            }
-        }
-    }
-}
