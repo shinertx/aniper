@@ -23,22 +23,16 @@ struct Cli {
     #[arg(long)]
     solana_url: Option<String>,
 
+    /// Replay mode for testing with mock data
+    #[arg(long)]
+    replay: Option<String>,
+
     #[command(subcommand)]
     command: Option<Commands>,
 }
 
 #[derive(Subcommand)]
-enum Commands {
-    /// Replay mode for testing with mock data
-    ///
-    /// This mode loads historical trading events from a JSON file and processes
-    /// them without connecting to live market feeds. Useful for testing and
-    /// backtesting trading strategies.
-    Replay {
-        /// Path to mock data JSON file (e.g., tests/data/mock_data.json)
-        file: String,
-    },
-}
+enum Commands {}
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -57,31 +51,18 @@ async fn main() -> Result<()> {
     // Track process (re)starts.
     metrics::inc_restart();
 
-    match cli.command {
-        Some(Commands::Replay { file }) => {
-            tracing::info!("Starting in replay mode with file: {}", file);
-            // For now, just log that we're in replay mode and verify file exists
-            if !std::path::Path::new(&file).exists() {
-                tracing::error!("Replay file not found: {}", file);
-                return Err(anyhow::anyhow!("Replay file not found: {}", file));
-            }
-            // The actual replay logic would be implemented later
-            std::thread::sleep(std::time::Duration::from_secs(1));
-            tracing::info!("Replay mode completed");
-            return Ok(());
-        }
-        None => {
-            // Normal execution mode
-            tracing::info!("Starting normal execution mode");
-        }
-    }
-
     let (feed_tx, feed_rx) = tokio::sync::mpsc::channel(10_000);
 
     // risk slippage channel
     let (slip_tx, slip_rx) = tokio::sync::mpsc::channel(256);
 
-    tokio::spawn(ws_feed::run(feed_tx));
+    let replay_file = cli.replay.clone();
+    if let Some(file) = replay_file {
+        tokio::spawn(ws_feed::run_replay(file, feed_tx));
+    } else {
+        tokio::spawn(ws_feed::run(feed_tx));
+    }
+    
     tokio::spawn(trader::run(feed_rx, slip_tx.clone()));
 
     // --- Risk management ---------------------------------------------------

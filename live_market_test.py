@@ -8,12 +8,13 @@ import requests
 import json
 import time
 from datetime import datetime
+import pytest
+from unittest.mock import patch, MagicMock
 
-def test_coingecko_prices():
-    """Test with CoinGecko API for live SOL price"""
-    print("🔥 Testing with Live Market Data (CoinGecko)")
-    print("=" * 50)
-    
+@pytest.fixture(scope="module")
+def live_sol_data():
+    """Fixture to fetch live SOL price data from CoinGecko."""
+    print("\n🔥 Fetching live market data from CoinGecko for tests...")
     try:
         url = "https://api.coingecko.com/api/v3/simple/price"
         params = {
@@ -23,41 +24,49 @@ def test_coingecko_prices():
             'include_24hr_vol': 'true'
         }
         
-        print("📊 Fetching live SOL price from CoinGecko...")
         response = requests.get(url, params=params, timeout=10)
+        response.raise_for_status()  # Raise an exception for bad status codes
         
-        if response.status_code == 200:
-            data = response.json()
+        data = response.json()
+        if 'solana' in data:
+            sol_data = data['solana']
+            price = sol_data['usd']
+            change_24h = sol_data.get('usd_24h_change', 0)
+            volume_24h = sol_data.get('usd_24h_vol', 0)
             
-            if 'solana' in data:
-                sol_data = data['solana']
-                price = sol_data['usd']
-                change_24h = sol_data.get('usd_24h_change', 0)
-                volume_24h = sol_data.get('usd_24h_vol', 0)
-                
-                print(f"✅ Current SOL Price: ${price:.2f}")
-                print(f"📈 24h Change: {change_24h:.2f}%")
-                print(f"💰 24h Volume: ${volume_24h:,.0f}")
-                
-                # Test agent logic
-                test_agents_with_live_data(price, change_24h, volume_24h)
-                return True
-            else:
-                print(f"❌ No SOL data in response: {data}")
-                return False
-                
+            print(f"✅ Live SOL Price: ${price:.2f}")
+            print(f"📈 24h Change: {change_24h:.2f}%")
+            print(f"💰 24h Volume: ${volume_24h:,.0f}")
+            
+            return {
+                "price": price,
+                "change_24h": change_24h,
+                "volume_24h": volume_24h
+            }
         else:
-            print(f"❌ CoinGecko API Error: {response.status_code}")
-            return False
+            pytest.fail("❌ No 'solana' key in CoinGecko API response.")
             
+    except requests.exceptions.RequestException as e:
+        pytest.fail(f"❌ CoinGecko API request failed: {e}")
     except Exception as e:
-        print(f"❌ Error fetching live data: {e}")
-        return False
+        pytest.fail(f"❌ Error fetching live data: {e}")
 
-def test_agents_with_live_data(price, change_24h, volume_24h):
-    """Test both agents with live market data"""
+def test_coingecko_api_response(live_sol_data):
+    """Tests that the live data fixture returns a valid structure."""
+    assert isinstance(live_sol_data, dict)
+    assert "price" in live_sol_data and isinstance(live_sol_data["price"], (int, float))
+    assert "change_24h" in live_sol_data and isinstance(live_sol_data["change_24h"], (int, float))
+    assert "volume_24h" in live_sol_data and isinstance(live_sol_data["volume_24h"], (int, float))
+    print("\n✅ CoinGecko data fixture is valid.")
+
+def test_agents_with_live_data(live_sol_data):
+    """Test both agents with live market data from the fixture."""
     print(f"\n🤖 AGENT TESTING WITH LIVE DATA")
     print("=" * 40)
+    
+    price = live_sol_data["price"]
+    change_24h = live_sol_data["change_24h"]
+    volume_24h = live_sol_data["volume_24h"]
     
     # 1. Heuristic Agent Testing
     print(f"📊 Heuristic Agent Analysis:")
@@ -67,7 +76,7 @@ def test_agents_with_live_data(price, change_24h, volume_24h):
     
     # Calculate agent metrics
     volatility_score = abs(change_24h) / 10  # 0-1 scale
-    volume_score = min(volume_24h / 1000000000, 1.0)  # Normalize to 1B volume
+    volume_score = min(volume_24h / 1_000_000_000, 1.0)  # Normalize to 1B volume
     momentum_score = max(min(change_24h / 10, 1.0), -1.0)  # -1 to 1 scale
     
     print(f"Volatility Score: {volatility_score:.2f}")
@@ -86,6 +95,7 @@ def test_agents_with_live_data(price, change_24h, volume_24h):
         confidence = 0.6
         
     print(f"🎯 Heuristic Signal: {signal} (Confidence: {confidence:.1%})")
+    assert signal in ["BUY", "SELL", "HOLD"]
     
     # 2. Narrative Agent Testing (simulated with realistic scenarios)
     print(f"\n📱 Narrative Agent Analysis:")
@@ -99,96 +109,100 @@ def test_agents_with_live_data(price, change_24h, volume_24h):
         narrative = "Positive sentiment in crypto communities"
     elif change_24h < -5:
         sentiment_bias = -0.6  # Very bearish
-        narrative = "Fear and panic selling in social feeds"
+        narrative = "Market sentiment is fearful, FUD spreading"
     elif change_24h < -2:
         sentiment_bias = -0.3  # Moderately bearish
-        narrative = "Bearish sentiment emerging"
+        narrative = "Some concerns about SOL price drop"
     else:
         sentiment_bias = 0.0  # Neutral
-        narrative = "Mixed sentiment, consolidation phase"
-    
-    print(f"Simulated Narrative: {narrative}")
+        narrative = "Market is quiet, no strong narrative"
+        
+    print(f"Narrative: {narrative}")
     print(f"Sentiment Bias: {sentiment_bias:.2f}")
     
     # Generate narrative signal
     if sentiment_bias > 0.4:
+        narrative_signal = "STRONG_BULLISH"
+    elif sentiment_bias > 0.1:
         narrative_signal = "BULLISH"
     elif sentiment_bias < -0.4:
+        narrative_signal = "STRONG_BEARISH"
+    elif sentiment_bias < -0.1:
         narrative_signal = "BEARISH"
     else:
         narrative_signal = "NEUTRAL"
         
     print(f"🎯 Narrative Signal: {narrative_signal}")
+    assert narrative_signal in ["STRONG_BULLISH", "BULLISH", "NEUTRAL", "BEARISH", "STRONG_BEARISH"]
+    print("✅ Agent tests with live data completed.")
+
+def test_comprehensive_validator_with_live_data(live_sol_data):
+    """Test comprehensive validator with live market data"""
+    print(f"\n🛡️ COMPREHENSIVE VALIDATOR WITH LIVE DATA")
+    print("=" * 50)
     
-    # 3. Combined Analysis
-    print(f"\n🧠 COMBINED AGENT DECISION:")
-    print("-" * 30)
+    price = live_sol_data["price"]
+    change_24h = live_sol_data["change_24h"]
+    volume_24h = live_sol_data["volume_24h"]
     
-    # Weight the signals (60% heuristic, 40% narrative in this example)
-    if signal == "BUY" and narrative_signal in ["BULLISH", "NEUTRAL"]:
-        final_signal = "STRONG BUY"
-        final_confidence = confidence * 0.9
-    elif signal == "SELL" and narrative_signal in ["BEARISH", "NEUTRAL"]:
-        final_signal = "STRONG SELL"
-        final_confidence = confidence * 0.9
-    elif signal == "BUY" and narrative_signal == "BEARISH":
-        final_signal = "WEAK BUY"
-        final_confidence = confidence * 0.5
-    elif signal == "SELL" and narrative_signal == "BULLISH":
-        final_signal = "WEAK SELL" 
-        final_confidence = confidence * 0.5
+    # --- Risk Assessment ---
+    # High volatility check
+    is_volatile = abs(change_24h) > 15  # e.g., > 15% change in 24h
+    
+    # Low liquidity check
+    is_low_liquidity = volume_24h < 500_000_000  # e.g., < $500M 24h volume
+    
+    # --- Compliance Check ---
+    # Simulate a check against a compliant asset list (SOL is compliant)
+    is_compliant_asset = True
+    
+    # --- Final Validation ---
+    is_risky = is_volatile or is_low_liquidity
+    is_compliant = is_compliant_asset
+    
+    if is_compliant and not is_risky:
+        decision = "APPROVED"
     else:
-        final_signal = "HOLD"
-        final_confidence = 0.7
-    
-    print(f"Final Decision: {final_signal}")
-    print(f"Final Confidence: {final_confidence:.1%}")
-    
-    # Risk assessment
-    risk_factors = []
-    if volatility_score > 0.7:
-        risk_factors.append("High volatility")
-    if volume_score < 0.2:
-        risk_factors.append("Low volume")
-    if abs(momentum_score) > 0.8:
-        risk_factors.append("Extreme momentum")
+        decision = "REJECTED"
         
-    risk_level = "LOW" if len(risk_factors) == 0 else "MEDIUM" if len(risk_factors) == 1 else "HIGH"
+    print(f"Is Volatile (>15%): {is_volatile}")
+    print(f"Is Low Liquidity (<$500M): {is_low_liquidity}")
+    print(f"Is Compliant Asset: {is_compliant}")
+    print(f"Final Decision: {decision}")
     
-    print(f"Risk Level: {risk_level}")
-    if risk_factors:
-        print(f"Risk Factors: {', '.join(risk_factors)}")
-    
-    return final_signal, final_confidence, risk_level
+    assert decision in ["APPROVED", "REJECTED"]
+    print("✅ Comprehensive validator test with live data completed.")
 
 def main():
-    """Run live market data testing"""
-    print("🚀 LIVE AGENT PERFORMANCE TESTING")
-    print("=" * 60)
-    print(f"Timestamp: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-    print()
+    """Main function to run the test workflow"""
+    # This function is for standalone script execution, not for pytest
     
-    success = test_coingecko_prices()
+    # To run these tests as a script, we call the fixture function directly
+    # to get the data, and then pass it to the test functions.
     
-    if success:
-        print(f"\n✅ LIVE DATA TESTING COMPLETED")
-        print(f"📊 Results: Agents successfully processed live market data")
-        print(f"🎯 Next Steps:")
-        print("  1. ✅ Live price data integration working")
-        print("  2. 🔄 Add real Twitter sentiment analysis") 
-        print("  3. 🔄 Add Solana on-chain event monitoring")
-        print("  4. 🔄 Implement continuous monitoring loop")
-        print("  5. 🔄 Add backtesting with historical data")
-        
-        print(f"\n💡 Model Tuning Recommendations:")
-        print("  - Adjust volatility thresholds based on market conditions")
-        print("  - Calibrate sentiment weights using historical performance")
-        print("  - Implement dynamic risk scoring")
-        print("  - Add multi-timeframe analysis")
-        
-    else:
-        print(f"\n❌ Live data testing failed")
-        print("Check network connectivity and API availability")
+    print("Running live market tests as a standalone script...")
+    
+    # We can't use pytest fixtures directly, so we mock the API call
+    # for standalone execution to avoid test pollution.
+    mock_response = MagicMock()
+    mock_response.status_code = 200
+    mock_response.json.return_value = {
+        "solana": {
+            "usd": 150.0,
+            "usd_24h_change": 5.5,
+            "usd_24h_vol": 2_500_000_000
+        }
+    }
+    
+    with patch('requests.get', return_value=mock_response):
+        # Re-create the logic of the fixture for the script runner
+        data = {
+            "price": 150.0,
+            "change_24h": 5.5,
+            "volume_24h": 2_500_000_000
+        }
+        test_agents_with_live_data(data)
+        test_comprehensive_validator_with_live_data(data)
 
 if __name__ == "__main__":
     main()

@@ -138,6 +138,30 @@ pub fn normalise_message(raw: &str, platform: Platform) -> Option<LaunchEvent> {
     }
 }
 
+/// Runs the replay mode, reading events from a JSON file and sending them to the trader.
+pub async fn run_replay(file_path: String, tx: Sender<LaunchEvent>) -> Result<()> {
+    info!(target = "ws_feed", "Starting replay from file: {}", file_path);
+    let file_content = std::fs::read_to_string(&file_path)
+        .with_context(|| format!("Failed to read replay file: {}", file_path))?;
+
+    // Assuming the file contains a JSON array of LaunchEvent
+    let events: Vec<LaunchEvent> = serde_json::from_str(&file_content)
+        .with_context(|| "Failed to parse replay file JSON")?;
+
+    for event in events {
+        info!(target = "ws_feed", "Replaying event for mint: {}", event.mint);
+        if let Err(e) = tx.send(event).await {
+            error!(target = "ws_feed", "Failed to send replayed event to trader: {}", e);
+            break; // Stop replay on channel error
+        }
+        // Add a small delay to simulate real-time event flow
+        tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
+    }
+
+    info!(target = "ws_feed", "Replay finished.");
+    Ok(())
+}
+
 /// Returns the websocket URL to use, derived from the `SOLANA_RPC_URL`
 /// environment variable.
 fn ws_url() -> String {
