@@ -70,7 +70,8 @@ async fn trade_flow_confirmed() {
         mint: "TEST".into(),
         creator: "CREATOR".into(),
         holders_60: 100,
-        lp: 1.0,
+        lp: 99999.0, // Set high to pass liquidity check
+        platform: executor::ws_feed::Platform::PumpFun,
     };
     tx.send(ev).await.unwrap();
     drop(tx); // close channel so trader exits after processing.

@@ -102,6 +102,7 @@ async fn main() -> Result<()> {
             let label = match kind {
                 KillSwitch::EquityFloor => "equity_floor",
                 KillSwitch::Slippage => "slippage",
+                KillSwitch::PortfolioStopLoss => "portfolio_stop_loss",
             };
             metrics::inc_killswitch(label);
             tracing::error!(

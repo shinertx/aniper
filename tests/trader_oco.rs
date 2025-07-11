@@ -82,6 +82,7 @@ async fn oco_two_orders_and_slippage_sample() {
         creator: "CREATOR".into(),
         holders_60: 120,
         lp: 1.1,
+        platform: executor::ws_feed::Platform::PumpFun,
     };
     evt_tx.send(ev).await.unwrap();
     drop(evt_tx);

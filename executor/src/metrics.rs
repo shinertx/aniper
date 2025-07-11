@@ -71,12 +71,21 @@ pub fn set_risk_slippage_threshold(_threshold: f64) {
     metrics::gauge!("risk_slippage_threshold", _threshold);
 }
 
-// --- Trade metrics helpers -------------------------------------------------
-pub fn inc_trades_confirmed() {
-    metrics::increment_counter!("trades_confirmed");
+pub fn set_risk_portfolio_stop_loss(value: f64) {
+    metrics::gauge!("risk_portfolio_stop_loss_usd", value);
 }
-pub fn inc_trades_submitted() {
-    metrics::increment_counter!("trades_submitted");
+
+// --- Trade metrics helpers -------------------------------------------------
+/// Increments submitted trades counter for a given platform.
+pub fn inc_trades_submitted(platform: &str) {
+    let p: &'static str = Box::leak(platform.to_owned().into_boxed_str());
+    metrics::increment_counter!("trades_submitted", "platform" => p);
+}
+
+/// Increments confirmed trades counter for a given platform.
+pub fn inc_trades_confirmed(platform: &str) {
+    let p: &'static str = Box::leak(platform.to_owned().into_boxed_str());
+    metrics::increment_counter!("trades_confirmed", "platform" => p);
 }
 
 /// Increment the killswitch counter for the provided `kind` label.

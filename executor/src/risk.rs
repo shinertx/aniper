@@ -4,21 +4,23 @@
 //    threshold (default 300 USDC).
 // 2. Slippage Sentinel – kill-switch if realised trade slippage breaches an
 //    adaptive tail threshold based on a 20-period EMA of volatility.
+// 3. Portfolio Stop-Loss - kill-switch if total portfolio value drops by a
+//    configured percentage from its peak.
 // ---------------------------------------------------------------------------
 
 use anyhow::{anyhow, Result};
 use once_cell::sync::Lazy;
 use solana_client::rpc_client::RpcClient;
 use solana_sdk::signature::read_keypair_file;
-/* -------------------------------------------------------------------------
- * NEW: bring `Signer` trait into scope so `pubkey()` resolves
- * ---------------------------------------------------------------------- */
 use solana_sdk::signer::Signer;
 use std::sync::atomic::{AtomicU64, Ordering};
 use tokio::sync::{broadcast::Sender, mpsc::Receiver};
 use tokio::time::{sleep, Duration};
 
-use crate::metrics::{set_risk_equity_usdc, set_risk_last_slippage, set_risk_slippage_threshold};
+use crate::metrics::{
+    set_risk_equity_usdc, set_risk_last_slippage, set_risk_portfolio_stop_loss,
+    set_risk_slippage_threshold,
+};
 
 const LAMPORTS_PER_USDC: f64 = 1_000_000.0;
 
@@ -39,10 +41,11 @@ fn rpc_url() -> String {
         })
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum KillSwitch {
     EquityFloor,
     Slippage,
+    PortfolioStopLoss,
 }
 
 // ---------------------------------------------------------------------------
@@ -56,7 +59,7 @@ pub fn _set_mock_balance_usdc(usdc: f64) {
     BALANCE_OVERRIDE_CENTS.store((usdc * 100.0) as u64, Ordering::Relaxed);
 }
 
-async fn get_balance_usdc() -> Result<f64> {
+pub async fn get_balance_usdc() -> Result<f64> {
     // Test override takes priority.
     if let Some(v) = {
         let raw = BALANCE_OVERRIDE_CENTS.load(Ordering::Relaxed);
@@ -89,18 +92,6 @@ async fn redis_f64(key: &str) -> Option<f64> {
         panic!("REDIS_URL not set – refusing to start (risk module)");
     });
 
-    // Enforce TLS unless explicitly connecting to local dev instance.
-    /* -------------------------------------------------------------------------
-     * FIX: The TLS check is too restrictive for Docker-based dev environments
-     * where `redis` is a valid hostname.  We'll remove this check.
-     * ---------------------------------------------------------------------- */
-    // if !(url.starts_with("rediss://")
-    //     || url.starts_with("redis://127.0.0.1")
-    //     || url.starts_with("redis://localhost"))
-    // {
-    //     panic!("Insecure Redis URL (TLS required): {url}");
-    // }
-
     if let Ok(client) = redis::Client::open(url) {
         if let Ok(mut conn) = client.get_async_connection().await {
             let res: redis::RedisResult<Option<String>> = redis::Cmd::new()
@@ -123,16 +114,16 @@ async fn redis_f64(key: &str) -> Option<f64> {
 /// Spawns the equity-floor and slippage sentinels.  Returns immediately – the
 /// inner tasks run for the lifetime of the executor process.
 pub async fn run(kill_tx: Sender<KillSwitch>, mut slippage_rx: Receiver<f64>) -> Result<()> {
+    let poll_ms: u64 = std::env::var("RISK_EQUITY_POLL_MS")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(5000); // Poll every 5 seconds
+
     //--------------------------------------------------
     // Equity-floor guard
     //--------------------------------------------------
     let kill_tx_eq = kill_tx.clone();
     tokio::spawn(async move {
-        let poll_ms: u64 = std::env::var("RISK_EQUITY_POLL_MS")
-            .ok()
-            .and_then(|v| v.parse().ok())
-            .unwrap_or(60_000);
-
         let mut floor = redis_f64("risk:equity_floor").await.unwrap_or(300.0);
 
         loop {
@@ -144,7 +135,7 @@ pub async fn run(kill_tx: Sender<KillSwitch>, mut slippage_rx: Receiver<f64>) ->
                     }
                 }
                 Err(e) => {
-                    tracing::warn!(target = "risk", "balance fetch error: {e}");
+                    tracing::warn!(target = "risk", "balance fetch error (equity floor): {e}");
                 }
             }
 
@@ -153,6 +144,54 @@ pub async fn run(kill_tx: Sender<KillSwitch>, mut slippage_rx: Receiver<f64>) ->
                 floor = f;
             }
 
+            sleep(Duration::from_millis(poll_ms)).await;
+        }
+    });
+
+    //--------------------------------------------------
+    // Portfolio Stop-Loss guard
+    //--------------------------------------------------
+    let kill_tx_sl = kill_tx.clone();
+    tokio::spawn(async move {
+        let stop_loss_percent = std::env::var("PORTFOLIO_STOP_LOSS_PERCENT")
+            .ok()
+            .and_then(|v| v.parse::<f64>().ok())
+            .unwrap_or(25.0); // Default to 25%
+
+        let mut peak_equity: f64 = 0.0;
+        let mut initialized = false;
+
+        loop {
+            match get_balance_usdc().await {
+                Ok(bal) => {
+                    if !initialized {
+                        peak_equity = bal;
+                        initialized = true;
+                        tracing::info!(target = "risk", "Initialized portfolio peak equity at {:.2} USDC", peak_equity);
+                    } else {
+                        peak_equity = peak_equity.max(bal);
+                    }
+
+                    let stop_loss_level =
+                        peak_equity * (1.0 - (stop_loss_percent / 100.0));
+
+                    set_risk_portfolio_stop_loss(stop_loss_level);
+
+                    if bal < stop_loss_level {
+                        tracing::error!(
+                            target = "risk",
+                            "PORTFOLIO STOP-LOSS TRIGGERED! Current equity {:.2} < stop-loss level {:.2} (peak: {:.2})",
+                            bal, stop_loss_level, peak_equity
+                        );
+                        let _ = kill_tx_sl.send(KillSwitch::PortfolioStopLoss);
+                        // Stop this task after triggering
+                        break;
+                    }
+                }
+                Err(e) => {
+                    tracing::warn!(target = "risk", "balance fetch error (stop-loss): {e}");
+                }
+            }
             sleep(Duration::from_millis(poll_ms)).await;
         }
     });
