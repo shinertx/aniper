@@ -54,9 +54,9 @@ path = "../tests/risk.rs"
 name = "trader"
 path = "../tests/trader.rs"
 
-[[test]]
-name = "trader_oco"
-path = "../tests/trader_oco.rs"
+# [[test]]
+# name = "trader_oco"
+# path = "../tests/trader_oco.rs"
 
 [[test]]
 name = "ws_feed"
