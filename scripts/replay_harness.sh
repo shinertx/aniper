@@ -1,13 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Ignore SIGINT (Ctrl+C) to prevent interruptions from the environment
-trap '' INT
-
-# --- Configuration ---
-MOCK_DATA_DIR="tests/data"
-DEFAULT_MOCK_DATA="$MOCK_DATA_DIR/mock_data.json"
-
 # --- Helper Functions ---
 info() {
     echo "[INFO] $1"
@@ -18,10 +11,25 @@ error() {
     exit 1
 }
 
+# Load environment variables from .env file if it exists
+if [ -f .env ]; then
+  info "Loading environment variables from .env file..."
+  set -a # automatically export all variables
+  source .env
+  set +a # stop automatically exporting
+fi
+
+# Ignore SIGINT (Ctrl+C) to prevent interruptions from the environment
+trap '' INT
+
+# --- Configuration ---
+MOCK_DATA_DIR="tests/data"
+DEFAULT_MOCK_DATA="$MOCK_DATA_DIR/mock_data.json"
+
 # --- Argument Parsing ---
 DRY_RUN=false
 PLATFORMS_ARG=""
-HISTORICAL=false
+REPLAY_FILE=""
 
 # Handle named arguments first
 while [[ $# -gt 0 ]]; do
@@ -36,9 +44,10 @@ while [[ $# -gt 0 ]]; do
         shift # past argument
         shift # past value
         ;;
-        --historical)
-        HISTORICAL=true
+        --replay-file)
+        REPLAY_FILE="$2"
         shift # past argument
+        shift # past value
         ;;
         *)    # unknown option, assume it's a platform name
         break
@@ -51,6 +60,22 @@ if [ "$DRY_RUN" = true ]; then
 fi
 
 # --- Main Logic ---
+
+# If a specific replay file is provided, use it and exit.
+if [ -n "$REPLAY_FILE" ]; then
+    if [ ! -f "$REPLAY_FILE" ]; then
+        error "Replay file not found: $REPLAY_FILE"
+    fi
+    info "Executing replay with specific file: $REPLAY_FILE"
+    cmd="cargo run --release --bin executor -- --replay $REPLAY_FILE"
+
+    if [ "$DRY_RUN" = true ]; then
+        echo "DRY RUN CMD: $cmd"
+    else
+        eval "$cmd"
+    fi
+    exit 0
+fi
 
 # Handle historical replay first as it's a special case
 if [ "$HISTORICAL" = true ]; then

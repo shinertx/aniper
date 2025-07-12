@@ -39,6 +39,8 @@ services:
       retries: 3
     volumes:
       - ${HOST_KEYPAIR_PATH:-$HOME/.config/solana/id.json}:/wallet/id.json:ro
+      - .:/app:ro
+    working_dir: /app
     env_file:
       - .env
 

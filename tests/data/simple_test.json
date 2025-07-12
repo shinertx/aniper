@@ -1,0 +1,33 @@
+[
+  {
+    "timestamp": "2025-07-12T12:00:00Z",
+    "platform": "pump.fun",
+    "event_type": "new_token",
+    "token_info": {
+      "mint": "EKpQGSJtjMFqKZ9KQanSqYXRcF8fBopzL7XzMkx5knXG",
+      "name": "SimpleCoin",
+      "symbol": "SIM",
+      "description": "A simple test coin.",
+      "image_uri": "http://example.com/logo.png",
+      "metadata_uri": "http://example.com/metadata.json",
+      "twitter": "https://twitter.com/simplecoin",
+      "telegram": "https://t.me/simplecoin",
+      "website": "http://example.com",
+      "creator": "7iKbnk2Y2k2g8a4k2y2k2g8a4k2y2k2g8a4k2y2k2g8a4k2y2k2g8a4k2y2k2g8a",
+      "bonding_curve": "D1bZ1bZ1bZ1bZ1bZ1bZ1bZ1bZ1bZ1bZ1bZ1bZ1bZ1bZ1bZ1bZ1bZ1bZ1bZ1bZ1bZ"
+    },
+    "market_state": {
+      "market_cap_sol": 10.0,
+      "reply_count": 5,
+      "total_trades": 10,
+      "unique_traders": 8
+    },
+    "social_sentiment": {
+      "platform": "twitter",
+      "positive_mentions": 100,
+      "negative_mentions": 5,
+      "neutral_mentions": 20,
+      "engagement_ratio": 0.85
+    }
+  }
+]
