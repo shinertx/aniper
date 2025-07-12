@@ -5,10 +5,6 @@ Tests Jupiter API with meme coins and validates agent logic with current pump.fu
 """
 
 import requests
-import json
-import time
-from datetime import datetime
-import os
 import pytest
 from unittest.mock import patch, MagicMock
 
@@ -105,7 +101,7 @@ def test_jupiter_api_response(meme_prices):
 
 def test_meme_heuristic_agent(meme_prices):
     """Test heuristic agent logic with live meme coin price data"""
-    print(f"\n🤖 Testing Meme Coin Heuristic Agent Logic:")
+    print("\n🤖 Testing Meme Coin Heuristic Agent Logic:")
     print("-" * 40)
     
     for symbol, data in meme_prices.items():
@@ -148,7 +144,7 @@ def test_meme_heuristic_agent(meme_prices):
 
 def test_meme_narrative_simulation(meme_prices):
     """Simulate narrative agent with mock meme coin social data"""
-    print(f"\n📱 Testing Meme Coin Narrative Simulation:")
+    print("\n📱 Testing Meme Coin Narrative Simulation:")
     print("-" * 40)
     
     # Simulate social media narratives for the fetched coins
@@ -188,7 +184,7 @@ def test_meme_narrative_simulation(meme_prices):
 
 def test_comprehensive_validator_simulation(meme_prices):
     """Comprehensive test for the validator agent using live data"""
-    print(f"\n🛡️ Testing Meme Coin Comprehensive Validator:")
+    print("\n🛡️ Testing Meme Coin Comprehensive Validator:")
     print("-" * 50)
     
     for symbol, data in meme_prices.items():

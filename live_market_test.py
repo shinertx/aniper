@@ -5,9 +5,6 @@ Tests real market APIs to validate agent performance with live data.
 """
 
 import requests
-import json
-import time
-from datetime import datetime
 import pytest
 from unittest.mock import patch, MagicMock
 
@@ -61,7 +58,7 @@ def test_coingecko_api_response(live_sol_data):
 
 def test_agents_with_live_data(live_sol_data):
     """Test both agents with live market data from the fixture."""
-    print(f"\n🤖 AGENT TESTING WITH LIVE DATA")
+    print("\n🤖 AGENT TESTING WITH LIVE DATA")
     print("=" * 40)
     
     price = live_sol_data["price"]
@@ -69,7 +66,7 @@ def test_agents_with_live_data(live_sol_data):
     volume_24h = live_sol_data["volume_24h"]
     
     # 1. Heuristic Agent Testing
-    print(f"📊 Heuristic Agent Analysis:")
+    print("📊 Heuristic Agent Analysis:")
     print(f"Current Price: ${price:.2f}")
     print(f"Price Change: {change_24h:.2f}%")
     print(f"Volume: ${volume_24h:,.0f}")
@@ -98,7 +95,7 @@ def test_agents_with_live_data(live_sol_data):
     assert signal in ["BUY", "SELL", "HOLD"]
     
     # 2. Narrative Agent Testing (simulated with realistic scenarios)
-    print(f"\n📱 Narrative Agent Analysis:")
+    print("\n📱 Narrative Agent Analysis:")
     
     # Simulate social sentiment based on price action
     if change_24h > 5:
@@ -138,10 +135,9 @@ def test_agents_with_live_data(live_sol_data):
 
 def test_comprehensive_validator_with_live_data(live_sol_data):
     """Test comprehensive validator with live market data"""
-    print(f"\n🛡️ COMPREHENSIVE VALIDATOR WITH LIVE DATA")
+    print("\n🛡️ COMPREHENSIVE VALIDATOR WITH LIVE DATA")
     print("=" * 50)
     
-    price = live_sol_data["price"]
     change_24h = live_sol_data["change_24h"]
     volume_24h = live_sol_data["volume_24h"]
     

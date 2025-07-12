@@ -4,26 +4,9 @@ Manual Trade Trigger
 Creates a simple trade signal to test if the executor will actually execute trades.
 """
 
-    print(f"\n📊 Final Redis state:")
-    keys = r.keys('*')
-    for key in sorted(keys):
-        try:
-            key_type = r.type(key)
-            if key_type == 'list':
-                count = r.llen(key)
-                print(f"  {key} (list): {count} items")
-                if count > 0:
-                    latest = r.lindex(key, 0)
-                    print(f"    Latest: {latest[:100] if latest else 'None'}...")
-            elif key_type == 'string':
-                value = r.get(key)
-                print(f"  {key} (string): {str(value)[:100] if value else 'None'}")
-            else:
-                print(f"  {key} ({key_type}): [other type]")
-        except Exception as e:
-            print(f"  {key}: [error: {e}]")
 import json
 import time
+import redis
 from datetime import datetime
 
 def trigger_test_trade():
@@ -115,16 +98,16 @@ def trigger_test_trade():
         except Exception as e:
             print(f"  {key}: [error reading: {e}]")
     
-    print(f"\n🎯 Test trade signal created!")
-    print(f"💰 Target: Buy $5 worth of BONK")
-    print(f"📈 Max Slippage: 3%") 
-    print(f"🤖 Signal pushed to multiple Redis queues")
+    print("\n🎯 Test trade signal created!")
+    print("💰 Target: Buy $5 worth of BONK")
+    print("📈 Max Slippage: 3%") 
+    print("🤖 Signal pushed to multiple Redis queues")
     
     return True
 
 def monitor_execution():
     """Monitor for trade execution"""
-    print(f"\n👁️ MONITORING FOR TRADE EXECUTION")
+    print("\n👁️ MONITORING FOR TRADE EXECUTION")
     print("=" * 50)
     
     r = redis.Redis(host='localhost', port=6379, decode_responses=True)
@@ -152,7 +135,7 @@ def monitor_execution():
         
         time.sleep(2)
     
-    print(f"\n\n📊 Final Redis state:")
+    print("\n\n📊 Final Redis state:")
     keys = r.keys('*')
     for key in sorted(keys):
         value = r.get(key)
@@ -178,9 +161,9 @@ def main():
         # Monitor for execution
         monitor_execution()
     
-    print(f"\n✅ Test completed!")
-    print(f"💡 Check executor logs with: docker logs aniper-executor --tail 20")
-    print(f"📊 Check Prometheus metrics at: http://localhost:9090")
+    print("\n✅ Test completed!")
+    print("💡 Check executor logs with: docker logs aniper-executor --tail 20")
+    print("📊 Check Prometheus metrics at: http://localhost:9090")
 
 if __name__ == "__main__":
     main()

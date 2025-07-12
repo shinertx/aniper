@@ -6,14 +6,12 @@ Connects to real Twitter/X feeds and Solana data to validate agents in real-time
 
 import asyncio
 import json
-import time
 import requests
 import websockets
 import os
 from datetime import datetime, timedelta
-import pandas as pd
 import numpy as np
-from typing import Dict, List, Optional
+from typing import List
 
 # Environment setup
 TWITTER_BEARER = os.getenv('TWITTER_BEARER')
@@ -44,7 +42,7 @@ class LiveDataCollector:
         # Twitter API v2 search endpoint
         for keyword in keywords:
             try:
-                url = f"https://api.twitter.com/2/tweets/search/recent"
+                url = "https://api.twitter.com/2/tweets/search/recent"
                 params = {
                     'query': f'{keyword} -is:retweet lang:en',
                     'tweet.fields': 'created_at,public_metrics,context_annotations',
@@ -263,7 +261,7 @@ async def main():
     tester.test_heuristic_agent()
     
     print("\n✅ Live data testing completed!")
-    print(f"📊 Total Data Collected:")
+    print("📊 Total Data Collected:")
     print(f"  - Twitter: {len(collector.twitter_data)} tweets")
     print(f"  - Solana: {len(collector.solana_data)} events") 
     print(f"  - Jupiter: {len(collector.jupiter_data)} quotes")

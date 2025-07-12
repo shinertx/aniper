@@ -1,4 +1,3 @@
-import pytest  # type: ignore
 
 from brain.agents.narrative_agent import score_narratives
 

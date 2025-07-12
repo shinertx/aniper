@@ -22,7 +22,7 @@ async def send_fake_launch_event():
         "lp": 0.85  # Good liquidity ratio
     }
     
-    print(f"📊 Fake Launch Event:")
+    print("📊 Fake Launch Event:")
     print(f"   Mint: {fake_launch['mint']}")
     print(f"   Creator: {fake_launch['creator']}")
     print(f"   Holders: {fake_launch['holders_60']}")
@@ -53,10 +53,10 @@ async def send_fake_launch_event():
                 
     except Exception as e:
         print(f"❌ WebSocket connection failed: {e}")
-        print(f"\n💡 This approach won't work because:")
-        print(f"   1. The executor has its own WebSocket connection")
-        print(f"   2. We can't inject events into its stream")
-        print(f"   3. We need to modify the trader to read Redis signals")
+        print("\n💡 This approach won't work because:")
+        print("   1. The executor has its own WebSocket connection")
+        print("   2. We can't inject events into its stream")
+        print("   3. We need to modify the trader to read Redis signals")
 
 def main():
     print("🎭 WEBSOCKET LAUNCH EVENT SIMULATOR")
@@ -67,7 +67,7 @@ def main():
     # Run the async function
     asyncio.run(send_fake_launch_event())
     
-    print(f"\n📋 ANALYSIS: Why the trading system isn't executing")
+    print("\n📋 ANALYSIS: Why the trading system isn't executing")
     print("=" * 60)
     print("✅ Current system architecture:")
     print("   • Executor listens to Solana WebSocket for new token launches")

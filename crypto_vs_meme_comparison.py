@@ -5,7 +5,6 @@ Shows how the system handles traditional crypto assets vs meme coins differently
 """
 
 import requests
-import json
 from datetime import datetime
 
 def test_traditional_crypto():
@@ -44,7 +43,6 @@ def test_traditional_crypto():
             if response.status_code == 200:
                 data = response.json()
                 
-                in_amount = int(data['inAmount'])
                 out_amount = int(data['outAmount'])
                 price_impact = float(data.get('priceImpactPct', 0))
                 
@@ -91,11 +89,11 @@ def analyze_traditional_crypto(symbol, price, price_impact):
     print(f"   🎯 Signal: {signal}")
     print(f"   💪 Confidence: {confidence:.1%}")
     print(f"   ⚠️  Risk: {risk_level}")
-    print(f"   🎨 Strategy: Long-term, fundamental-based")
+    print("   🎨 Strategy: Long-term, fundamental-based")
 
 def test_meme_coins():
     """Test with meme coins"""
-    print(f"\n🎪 MEME COIN ANALYSIS")
+    print("\n🎪 MEME COIN ANALYSIS")
     print("=" * 50)
     
     jupiter_api = "https://quote-api.jup.ag/v6"
@@ -181,7 +179,7 @@ def analyze_meme_coin(symbol, price, price_impact):
     print(f"   🎯 Signal: {signal}")
     print(f"   💪 Confidence: {confidence:.1%}")
     print(f"   ⚠️  Risk: {risk_level}")
-    print(f"   🎨 Strategy: Short-term, momentum-based")
+    print("   🎨 Strategy: Short-term, momentum-based")
 
 def main():
     """Compare traditional crypto vs meme coin analysis"""
@@ -198,7 +196,7 @@ def main():
     test_meme_coins()
     
     # Summary comparison
-    print(f"\n📋 AGENT STRATEGY COMPARISON")
+    print("\n📋 AGENT STRATEGY COMPARISON")
     print("=" * 60)
     print("💼 TRADITIONAL CRYPTO AGENTS:")
     print("   • Focus: Liquidity, stability, fundamentals")
@@ -207,14 +205,14 @@ def main():
     print("   • Price Impact Tolerance: <0.1% preferred")
     print("   • Strategy: DCA, HODLing, portfolio allocation")
     
-    print(f"\n🎪 MEME COIN AGENTS:")
+    print("\n🎪 MEME COIN AGENTS:")
     print("   • Focus: Momentum, social sentiment, volatility")
     print("   • Risk: High risk, high reward")
     print("   • Signals: Short-term, pump detection")
     print("   • Price Impact Tolerance: >1% acceptable")
     print("   • Strategy: Quick entry/exit, social momentum")
     
-    print(f"\n🎯 KEY DIFFERENCES:")
+    print("\n🎯 KEY DIFFERENCES:")
     print("   • Time Horizon: Long-term vs Short-term")
     print("   • Risk Tolerance: Low vs High")
     print("   • Data Sources: On-chain vs Social + On-chain")

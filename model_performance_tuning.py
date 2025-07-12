@@ -8,12 +8,11 @@ to evaluate and tune the agent performance for live trading success.
 
 import json
 import asyncio
-import pandas as pd
 import numpy as np
 from datetime import datetime, timedelta
 import redis
 import logging
-from typing import Dict, List, Optional
+from typing import Dict, List
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -434,5 +433,5 @@ if __name__ == "__main__":
     for i, rec in enumerate(results['recommendations'], 1):
         print(f"{i}. {rec}")
     
-    print(f"\nResults stored in Redis and evaluation data saved to tests/data/realistic_market_data.json")
+    print("\nResults stored in Redis and evaluation data saved to tests/data/realistic_market_data.json")
     print("="*60)

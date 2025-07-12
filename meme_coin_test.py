@@ -4,11 +4,6 @@ Meme Coin Trading System Live Test
 Tests the agents with real pump.fun meme coin data and social sentiment.
 """
 
-import requests
-import json
-import time
-from datetime import datetime
-import re
 import pytest
 
 @pytest.fixture(scope="module")

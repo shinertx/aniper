@@ -13,7 +13,7 @@ def main():
     """Test the updated Redis-enabled trading system"""
     print("🎯 ENHANCED ANIPER TRADE EXECUTION TEST")
     print("=" * 60)
-    print(f"Testing: Redis trade signals + OCO orders + proper pricing")
+    print("Testing: Redis trade signals + OCO orders + proper pricing")
     print()
     
     # Connect to Redis
@@ -62,15 +62,15 @@ def main():
     # Push to the trade_signals queue that executor monitors
     r.lpush('trade_signals', json.dumps(trade_signal))
     
-    print(f"✅ Enhanced trade signal created:")
-    print(f"   🪙 Token: BONK")
+    print("✅ Enhanced trade signal created:")
+    print("   🪙 Token: BONK")
     print(f"   💰 Amount: ${trade_signal['amount_usdc']}")
     print(f"   📈 Take Profit: +{(trade_signal['take_profit_pct']-1)*100:.1f}%")
     print(f"   📉 Stop Loss: -{(1-trade_signal['stop_loss_pct'])*100:.1f}%")
     print(f"   ⚠️  Max Slippage: {trade_signal['max_slippage']}%")
     
     # 3. Enhanced monitoring with execution tracking
-    print(f"\n👁️ Enhanced monitoring (45 seconds)...")
+    print("\n👁️ Enhanced monitoring (45 seconds)...")
     start_time = time.time()
     initial_count = r.llen('trade_signals')
     last_count = initial_count
@@ -106,20 +106,20 @@ def main():
         
         # Show execution details if found
         if execution_keys and elapsed % 10 == 0:  # Every 10 seconds
-            print(f"\n🔍 Execution artifacts found:")
+            print("\n🔍 Execution artifacts found:")
             for key in execution_keys[:3]:  # Show first 3
                 try:
                     value = r.get(key)
                     if value:
                         print(f"   {key}: {value[:80]}...")
-                except:
+                except Exception:
                     count = r.llen(key) if r.type(key) == 'list' else 'unknown'
                     print(f"   {key}: [{count} items]")
         
         time.sleep(2)
     
     # 4. Final status report
-    print(f"\n\n📊 FINAL EXECUTION REPORT")
+    print("\n\n📊 FINAL EXECUTION REPORT")
     print("=" * 50)
     
     final_signals = r.llen('trade_signals')
@@ -151,11 +151,11 @@ def main():
         except Exception as e:
             print(f"   {key}: [error: {e}]")
     
-    print(f"\n💡 Next steps:")
-    print(f"   📋 Check executor logs: docker logs aniper-executor --tail 20")
-    print(f"   📊 Check metrics: curl http://localhost:9185/metrics")
-    print(f"   🔍 Check health: curl http://localhost:9185/health")
-    print(f"   💰 Check wallet: May need USDC funding for actual swaps")
+    print("\n💡 Next steps:")
+    print("   📋 Check executor logs: docker logs aniper-executor --tail 20")
+    print("   📊 Check metrics: curl http://localhost:9185/metrics")
+    print("   🔍 Check health: curl http://localhost:9185/health")
+    print("   💰 Check wallet: May need USDC funding for actual swaps")
 
 if __name__ == "__main__":
     main()
